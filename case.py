@@ -19,6 +19,13 @@ class Case:
         self.short = True
 
         complete_time = event.get("completeTime")
+
+        self.first_event_time = (
+            datetime.strptime(complete_time, "%Y-%m-%d %H:%M:%S")
+            if isinstance(complete_time, str)
+            else complete_time
+        )
+
         self.last_event_time = (
             datetime.strptime(complete_time, "%Y-%m-%d %H:%M:%S")
             if isinstance(complete_time, str)
@@ -26,15 +33,16 @@ class Case:
         )
 
         self.t_since_last_event = timedelta(0)
-        self.expired = False
+        self.sleep = False
 
         self.have_crit_events = False
-        self.finished = False
+        self.ongoing = True
 
         self.last_delta = delta_name
         self.delta_counter = 0
 
         delta.new_cases += 1
+        delta.initialised_cases.add(self.case_id)
         delta.process_event(event)
 
         # print(f"[INIT] Initialized Case: {self.case_id}")
@@ -53,11 +61,13 @@ class Case:
         self.have_crit_events = self.event_check()
         self.length = len(self.trace)
 
-        self.finished = self.cancelled or self.isBilled
+        self.ongoing = not (self.cancelled or self.isBilled)
 
         if self.length >= 5: self.short = False
 
 
+        if self.case_id not in delta.initialised_cases:
+            delta.ongoing_cases.add(self.case_id)
 
         if self.last_delta != delta.delta_file_name:
             self.delta_counter = 0
@@ -82,27 +92,31 @@ class Case:
         self.issues.clear()  # Clear issues before re-evaluating
         completeness = True
 
-        if not self.have_crit_events:
+        if not self.cancelled:
+            if not self.have_crit_events:
+                completeness = False
+                self.issues.append("Missing critical events.")
+
+            if not self.isBilled:
+                completeness = False
+                self.issues.append("Case is not billed.")
+
+
+            # if self.short:
+            #     completeness = False
+            #     self.issues.append("Trace is too short (less than 5 events).")
+
+            if self.ongoing:
+                completeness = False
+                self.issues.append("Case is not finished.")
+
+
+
+            # print(f"[IS COMPLETE] Case {self.case_id} completeness check: {completeness} | Issues: {self.issues}")
+        else:
             completeness = False
-            self.issues.append("Missing critical events.")
 
-        if not self.isBilled:
-            completeness = False
-            self.issues.append("Case is not billed.")
 
-        # if self.short:
-        #     completeness = False
-        #     self.issues.append("Trace is too short (less than 5 events).")
-
-        if not self.finished:
-            completeness = False
-            self.issues.append("Case is not finished (not cancelled or billed).")
-
-        # if self.expired:
-        #     completeness = False
-        #     self.issues.append("Case has expired (exceeds max duration).")
-
-        # print(f"[IS COMPLETE] Case {self.case_id} completeness check: {completeness} | Issues: {self.issues}")
         return completeness
 
 
@@ -120,9 +134,11 @@ class Case:
         if self.last_delta != delta_name:
             self.delta_counter += 1
 
-        if (self.t_since_last_event > max_duration) & (not self.finished):
-            self.expired = True
-            # print(f"[UPDATE TIME] Case {self.case_id} marked as expired.")
+        if (self.t_since_last_event > max_duration) & (self.ongoing):
+            self.sleep = True
+            self.ongoing = False
+            # print(f"[UPDATE TIME] Case {self.case_id} marked as sleep.")
+
 
 
 
