@@ -1,6 +1,6 @@
 import os
 import pandas as pd
-from delta_log_formation import split_event_log
+from delta_log_formation import EventLogSplitter  # Updated import
 from case import Case
 from delta import Delta
 from config import dataset_path, initial_months, frequency, filename, output_dir
@@ -11,18 +11,20 @@ class ProcessManager:
         self.cases = {}
         self.delta_stats_list = []
         self.output_dir = output_dir
-        Delta.case_info = {"ongoing": [],
-                                   "completed": [],
-                                   "sleep": [],
-                                   "incomplete": [],
-                                   "cancelled": []
-                                   }
+        Delta.case_info = {
+            "ongoing": [],
+            "completed": [],
+            "sleep": [],
+            "incomplete": [],
+            "cancelled": []
+        }
 
     def check_or_split_logs(self):
         """Check if the split logs already exist. If not, perform the splitting."""
         if not os.path.exists(self.output_dir):
             print(f"Splitting event log into {frequency} delta logs...")
-            split_event_log(dataset_path, frequency, initial_months)
+            splitter = EventLogSplitter(dataset_path, frequency, initial_months)
+            splitter.process_event_log()
             print(f"Splitting completed. Logs saved in {self.output_dir}.")
         else:
             print(f"{frequency.capitalize()} delta logs already exist in {self.output_dir}. Skipping splitting.")
@@ -68,10 +70,9 @@ class ProcessManager:
         not_cancelled = case_df[(case_df["cancelled"] == False)]
 
         print(f"Number of Cases Processed: {processed_cases}")
-        print(f"Numnber of Cancelled Cases: {len(cancelled_cases)}")
+        print(f"Number of Cancelled Cases: {len(cancelled_cases)}")
         print(f"Number of Complete Cases (Without Cancelled cases): {len(completed_cases)}")
-        print(f"Ratio of Completeness out of not cancelled cases: {((len(completed_cases)/len(not_cancelled))*100):.2f}%")
-
+        print(f"Ratio of Completeness out of not cancelled cases: {((len(completed_cases) / len(not_cancelled)) * 100):.2f}%")
 
         output_path = f"Dataset/Hospital Billing Delta Logs/cases_output/cases_output_{filename}_{frequency}_({initial_months}).csv"
         case_df.to_csv(output_path, index=True)
@@ -104,3 +105,5 @@ class ProcessManager:
         # Save results
         self.save_delta_statistics()
         self.save_case_statistics()
+
+

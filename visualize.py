@@ -8,7 +8,7 @@ class VisualizationManager:
         self.delta_stats = pd.read_csv(delta_stats_path)
         self.case_stats = pd.read_csv(case_output_path)
 
-        self.complete_cases = self.case_stats[self.case_stats['isComplete']]
+        self.complete_cases = self.case_stats[self.case_stats['isComplete'] == True]
         self.cancelled_cases = self.case_stats[self.case_stats['cancelled']]
 
 
@@ -16,7 +16,6 @@ class VisualizationManager:
         """
         Plot a line chart showing the event counts for each delta file.
         """
-        # Extract and preprocess event counts
 
         self.delta_stats = self.delta_stats.drop(index=0)
         print(self.delta_stats.head())
@@ -49,7 +48,7 @@ class VisualizationManager:
         """
         # Aggregate data
         cancelled_cases = self.case_stats[self.case_stats["cancelled"]]
-        complete_cases = self.case_stats[self.case_stats["isComplete"]]
+        complete_cases = self.case_stats[self.case_stats["isComplete"] == True]
         ongoing_cases = self.case_stats[self.case_stats["ongoing"]]
         incomplete_cases = self.case_stats[(self.case_stats["cancelled"] == False) & (self.case_stats["isComplete"] ==False) & (self.case_stats["ongoing"] == False)]
 
