@@ -1,5 +1,6 @@
 from datetime import timedelta, datetime
 from delta import Delta
+from config import max_days
 
 class Case:
     def __init__(self, event, delta_name: str, delta: Delta):
@@ -15,6 +16,7 @@ class Case:
         self.last_state = event.get("state")
         self.last_event = event.get("event")
         self.unique_events = {self.last_event}
+        self.missing_events = []
         self.trace = [self.last_event]
         self.length = len(self.trace)
         self.issues = []
@@ -31,6 +33,7 @@ class Case:
         self.have_crit_events = False
         self.ongoing = True
 
+        self.first_delta = delta_name
         self.last_delta_update = delta_name
         self.delta_counter = 0
         self.delta_counts = [0]
@@ -54,9 +57,8 @@ class Case:
         self.update_event_attributes(event)
         self.update_case_status(event, delta)
         self.update_time_gap(event)
-        self.reset_delta_counter_if_needed(delta)
         self.check_completeness(event, delta)
-
+        self.append_delta(delta)
     def update_event_attributes(self, event):
         """Update attributes related to the event."""
         self.last_event = event.get('event')
@@ -78,6 +80,7 @@ class Case:
         if self.case_id not in delta.initialised_cases:
             delta.ongoing_cases_count.add(self.case_id)
 
+
     def update_time_gap(self, event):
         """Update the time gap between events."""
         complete_time = event.get("completeTime")
@@ -88,11 +91,14 @@ class Case:
         self.event_gaps.append(self.t_since_last_event)
         self.last_event_time = current_time
 
-    def reset_delta_counter_if_needed(self, delta: Delta):
-        """Reset the delta counter if the delta file changes."""
-        if self.last_delta_update != delta.delta_file_name:
-            self.delta_counter = 0
-            self.last_delta_update = delta.delta_file_name
+
+    def increase_delta_counter(self):
+        self.delta_counter += 1
+
+    def append_delta(self,delta: Delta):
+        self.delta_counts.append(self.delta_counter)
+        self.delta_counter = 0
+        self.last_delta_update = delta.delta_file_name
 
     def check_completeness(self, event, delta: Delta):
         """Check and update the completeness of the case."""
@@ -101,7 +107,11 @@ class Case:
 
     def event_check(self):
         """Check if all critical events are present."""
-        return self.critical_events.issubset(self.unique_events)
+        not_missing = self.critical_events.issubset(self.unique_events)
+
+        self.missing_events = self.critical_events - self.unique_events
+
+        return not_missing
 
     def is_complete(self):
         """Evaluate whether the case is complete."""
@@ -111,7 +121,7 @@ class Case:
         if not self.cancelled:
             if not self.have_crit_events:
                 completeness = False
-                self.issues.append("Missing critical events.")
+                self.issues.append(f"Missing critical events: {self.missing_events}")
 
             if not self.isBilled:
                 completeness = False
@@ -120,22 +130,18 @@ class Case:
             if self.ongoing:
                 completeness = False
                 self.issues.append("Case is not finished.")
-        else:
-            completeness = None
+        # else:
+        #     completeness = None
 
         return completeness
 
-    def update_time(self, current_time: timedelta, delta_name: str):
+    def update_time(self, current_time: timedelta):
         """Update time-related attributes."""
         if isinstance(current_time, str):
             current_time = datetime.strptime(current_time, "%Y-%m-%d %H:%M:%S")
 
-        max_duration = timedelta(days=190)
+        max_duration = timedelta(days=max_days)
         self.t_since_last_event = current_time - self.last_event_time
-
-        if self.last_delta_update != delta_name:
-            self.delta_counter += 1
-
         if (self.t_since_last_event > max_duration) and self.ongoing:
             self.sleep = True
             self.ongoing = False
