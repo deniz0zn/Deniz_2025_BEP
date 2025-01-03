@@ -1,6 +1,7 @@
 import os
 import pandas as pd
 from datetime import timedelta
+from config import delta_dir_path
 
 
 class EventLogSplitter:
@@ -16,7 +17,7 @@ class EventLogSplitter:
         self.frequency = frequency
         self.initial_months = initial_months
         self.filename = os.path.splitext(os.path.basename(csv_file_path))[0]
-        self.output_dir = f"Dataset/Hospital Billing Delta Logs/{self.filename}_{frequency}_({initial_months})"
+        self.output_dir = f"{delta_dir_path}{self.filename}_{frequency}_({initial_months})"
         self.dataframe = None
 
     def load_and_sort_event_log(self):
