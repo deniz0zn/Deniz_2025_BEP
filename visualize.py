@@ -1,6 +1,7 @@
 import plotly.express as px
 import plotly.graph_objects as go
 import pandas as pd
+from config import cases_output_path, delta_output_path
 
 
 class VisualizationManager:
@@ -17,7 +18,7 @@ class VisualizationManager:
         Plot a line chart showing the event counts for each delta file.
         """
 
-        self.delta_stats = self.delta_stats.drop(index=0)
+        # self.delta_stats = self.delta_stats.drop(index=0)
         print(self.delta_stats.head())
         self.delta_stats["delta_file_name"] = self.delta_stats["delta_file_name"].astype(str)
         event_counts_df = self.delta_stats[["delta_file_name", "event_counts"]]
@@ -72,13 +73,9 @@ class VisualizationManager:
 
 
 
-delta_stats_path = "Dataset/Hospital Billing Delta Logs/Delta Stats/delta_stats_Hospital Billing - Event Log_weekly_(8).csv"
-case_output_path = "Dataset/Hospital Billing Delta Logs/cases_output/cases_output_Hospital Billing - Event Log_weekly_(8).csv"
 
-# Initialize Visualization Manager
-viz_manager = VisualizationManager(delta_stats_path, case_output_path)
+viz_manager = VisualizationManager(delta_output_path, cases_output_path)
 
-# Generate Visualizations
 print("Generating Event Counts Line Chart...")
 viz_manager.plot_event_counts_line_chart()
 
