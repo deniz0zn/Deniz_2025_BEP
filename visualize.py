@@ -19,7 +19,6 @@ class VisualizationManager:
         """
 
         # self.delta_stats = self.delta_stats.drop(index=0)
-        print(self.delta_stats.head())
         self.delta_stats["delta_file_name"] = self.delta_stats["delta_file_name"].astype(str)
         event_counts_df = self.delta_stats[["delta_file_name", "event_counts"]]
 

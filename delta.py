@@ -35,16 +35,11 @@ class Delta:
         """
         # Check case status and update counters
 
-
         if (case.ongoing) and (case.case_id not in Delta.case_info["ongoing"]):
             self.ongoing_cases += 1
             Delta.case_info["ongoing"].append(case.case_id)
 
-        if (case.sleep) and (case.case_id not in Delta.case_info["sleep"]):
-            self.expired_cases += 1
-            Delta.case_info["sleep"].append(case.case_id)
-
-        if (case.isComplete == True) and (case.case_id not in Delta.case_info["completed"]):
+        if (case.isComplete == True and not (case.cancelled)) and (case.case_id not in Delta.case_info["completed"]):
             self.complete_cases += 1
             Delta.case_info["completed"].append(case.case_id)
 
