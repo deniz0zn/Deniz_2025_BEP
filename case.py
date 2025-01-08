@@ -33,6 +33,7 @@ class Case:
 
         self.t_since_last_event = timedelta(0)
         self.event_gaps = [self.t_since_last_event]
+        self.avg_wait_time = None
         self.sleep = False
 
         self.have_crit_events = False
@@ -57,7 +58,8 @@ class Case:
         delta.new_cases += 1
         delta.initialised_cases.add(self.case_id)
 
-    def update(self, event, delta: Delta):
+
+    def update(self, event, delta:Delta, delta_counts:pd.DataFrame):
         """Update the case attributes based on a new event."""
         self.update_event_attributes(event)
         self.update_case_status(event, delta)
@@ -94,6 +96,7 @@ class Case:
 
         self.t_since_last_event = current_time - self.last_event_time
         self.event_gaps.append(self.t_since_last_event)
+        self.avg_wait_time = sum(self.event_gaps, timedelta(0)) / len(self.event_gaps)
         self.last_event_time = current_time
 
 
