@@ -16,11 +16,16 @@ class Case:
         self.last_state = event.get("state")
         self.last_event = event.get("event")
         self.unique_events = {self.last_event}
-        self.missing_events = []
+        self.missing_events = {"BILLED", "FIN", "RELEASE", "CODE OK"}
         self.trace = [self.last_event]
         self.length = len(self.trace)
         self.issues = []
         self.cancelled = False
+
+        self.issues = [f"Missing critical events: {self.missing_events}",
+                       "Case is not billed.",
+                       "Case is not finished.",
+                       ]
 
         self.isComplete = False
         self.isBilled = False
