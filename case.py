@@ -6,7 +6,7 @@ class Case:
     def __init__(self, event, delta_name: str, delta: Delta):
         self.initialize_case_attributes(event, delta_name, delta)
         self.initialize_timestamps(event)
-        self.register_new_case(delta)
+        self.register_new_case(delta, event)
 
     def initialize_case_attributes(self, event, delta_name: str, delta: Delta):
         """Initialize the primary attributes of the Case."""
@@ -53,10 +53,11 @@ class Case:
         self.first_event_time = parsed_time
         self.last_event_time = parsed_time
 
-    def register_new_case(self, delta: Delta):
+    def register_new_case(self, delta: Delta, event):
         """Register the case as a new case in the Delta object."""
         delta.new_cases += 1
         delta.initialised_cases.add(self.case_id)
+        delta.process_event(event)
 
 
     def update(self, event, delta:Delta, delta_counts:pd.DataFrame):
