@@ -1,6 +1,8 @@
 from datetime import timedelta, datetime
+
+import pandas as pd
+
 from delta import Delta
-from config import max_days
 
 class Case:
     def __init__(self, event, delta_name: str, delta: Delta):
@@ -19,7 +21,7 @@ class Case:
         self.missing_events = {"BILLED", "FIN", "RELEASE", "CODE OK"}
         self.trace = [self.last_event]
         self.length = len(self.trace)
-        self.issues = []
+
         self.cancelled = False
 
         self.issues = [f"Missing critical events: {self.missing_events}",
@@ -41,7 +43,6 @@ class Case:
 
         self.first_delta = delta_name
         self.last_delta_update = delta_name
-        self.delta_counter = 0
         self.delta_counts = [0]
 
     def initialize_timestamps(self, event):
@@ -66,7 +67,7 @@ class Case:
         self.update_case_status(event, delta)
         self.update_time_gap(event)
         self.check_completeness(event, delta)
-        self.append_delta(delta)
+        self.append_delta(delta, delta_counts)
     def update_event_attributes(self, event):
         """Update attributes related to the event."""
         self.last_event = event.get('event')
@@ -101,12 +102,13 @@ class Case:
         self.last_event_time = current_time
 
 
-    def increase_delta_counter(self):
-        self.delta_counter += 1
 
-    def append_delta(self,delta: Delta):
-        self.delta_counts.append(self.delta_counter)
-        self.delta_counter = 0
+    def update_sleep(self):
+        self.sleep = True
+        self.ongoing = False
+
+    def append_delta(self,delta: Delta, delta_counts: pd.DataFrame):
+        self.delta_counts.append(delta_counts.loc[self.case_id, "count"])
         self.last_delta_update = delta.delta_file_name
 
     def check_completeness(self, event, delta: Delta):
@@ -117,7 +119,6 @@ class Case:
     def event_check(self):
         """Check if all critical events are present."""
         not_missing = self.critical_events.issubset(self.unique_events)
-
         self.missing_events = self.critical_events - self.unique_events
 
         return not_missing
@@ -144,13 +145,5 @@ class Case:
 
         return completeness
 
-    def update_time(self, current_time: timedelta):
-        """Update time-related attributes."""
-        if isinstance(current_time, str):
-            current_time = datetime.strptime(current_time, "%Y-%m-%d %H:%M:%S")
 
-        max_duration = timedelta(days=max_days)
-        self.t_since_last_event = current_time - self.last_event_time
-        if (self.t_since_last_event > max_duration) and self.ongoing:
-            self.sleep = True
-            self.ongoing = False
+

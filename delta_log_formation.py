@@ -22,7 +22,11 @@ class EventLogSplitter:
 
     def load_and_sort_event_log(self):
         """Loads and sorts the event log by 'completeTime'."""
-        self.dataframe = pd.read_csv(self.csv_file_path)
+        self.dataframe = pd.read_csv(self.csv_file_path, keep_default_na=False, na_values=['NaN', "", " "])
+        self.dataframe["case"] = self.dataframe["case"].astype(str)
+
+        
+
         self.dataframe['completeTime'] = pd.to_datetime(self.dataframe['completeTime']).dt.tz_localize(None)
         self.dataframe = self.dataframe.sort_values(by='completeTime')
         print("Event log loaded and sorted by 'completeTime'.")
@@ -70,7 +74,7 @@ class EventLogSplitter:
             group.to_csv(delta_log_path, index=False)
             print(f"Delta log for {period_str} saved to: {delta_log_path}")
 
-    def process_event_log(self):
+    def run_splitting(self):
         """Executes the full splitting process."""
         self.load_and_sort_event_log()
         delta_logs = self.split_initial_and_delta_logs()
