@@ -9,7 +9,7 @@ class VisualizationManager:
         self.delta_stats = pd.read_csv(delta_stats_path)
         self.case_stats = pd.read_csv(case_output_path)
 
-        self.complete_cases = self.case_stats[self.case_stats['isComplete'] == True]
+        self.complete_cases = self.case_stats[self.case_stats['complete'] == True]
         self.cancelled_cases = self.case_stats[self.case_stats['cancelled']]
 
 
@@ -48,9 +48,9 @@ class VisualizationManager:
         """
         # Aggregate data
         cancelled_cases = self.case_stats[self.case_stats["cancelled"]]
-        complete_cases = self.case_stats[self.case_stats["isComplete"] == True]
+        complete_cases = self.case_stats[self.case_stats["complete"] == True]
         ongoing_cases = self.case_stats[self.case_stats["ongoing"]]
-        incomplete_cases = self.case_stats[(self.case_stats["cancelled"] == False) & (self.case_stats["isComplete"] ==False) & (self.case_stats["ongoing"] == False)]
+        incomplete_cases = self.case_stats[(self.case_stats["cancelled"] == False) & (self.case_stats["complete"] ==False) & (self.case_stats["ongoing"] == False)]
 
         # Prepare data for the pie chart
         pie_data = pd.DataFrame({

@@ -20,3 +20,7 @@ Evaluate = True
 Plot = True
 
 evet_counter = dict()
+
+attributes_to_check = ["case", "event", "startTime", "completeTime",
+                       "isCancelled", "blocked", "isClosed", "state"
+                       ]

@@ -4,17 +4,18 @@ class Delta:
 
     def __init__(self, delta_file_name):
         # Initialize attributes to track statistics for the delta file
-        self.delta_file_name = delta_file_name  # Name of the delta file
-        self.event_counter = Counter()  # Counts occurrences of each event
-        self.new_cases = 0  # Number of new cases opened in this delta file
-        self.ongoing_cases = 0  # Number of cases ongoing in this delta file
-        self.expired_cases = 0  # Number of cases sleep in this delta file
-        self.complete_cases = 0  # Number of cases marked as complete
-        self.incomplete_cases = 0  # Number of cases marked as incomplete
-        self.cancelled = 0 # Number of cancelled cases
+        self.delta_file_name = delta_file_name
+        self.event_counter = Counter()
+        self.new_cases = 0
+        self.not_finished = 0
+        self.complete_cases = 0
+        self.incomplete_cases = 0
+        self.cancelled = 0
         self.total_event = sum(dict(self.event_counter).values())
         self.initialised_cases = set()
         self.ongoing_cases_count= set()
+
+
 
     def process_event(self, event):
         """
@@ -34,22 +35,23 @@ class Delta:
         :param case: A `Case` object.
         """
         # Check case status and update counters
+        case_info = self.case_info
 
-        if (case.ongoing) and (case.case_id not in Delta.case_info["ongoing"]):
-            self.ongoing_cases += 1
-            Delta.case_info["ongoing"].append(case.case_id)
+        if (case.cancelled):
+            case_info["cancelled"].add(case.case_id)
+            self.cancelled = len(case_info["cancelled"])
 
-        if (case.isComplete == True and not (case.cancelled)) and (case.case_id not in Delta.case_info["completed"]):
-            self.complete_cases += 1
-            Delta.case_info["completed"].append(case.case_id)
+        if (case.complete) and not (case.cancelled):
+            case_info["complete"].add(case.case_id)
+            self.complete_cases = len(case_info["complete"])
 
-        if not (case.isComplete == True) and (case.case_id not in Delta.case_info["incomplete"]):
-            self.incomplete_cases += 1
-            Delta.case_info["incomplete"].append(case.case_id)
+        if (case.ongoing):
+            case_info["not_finished"].add(case.case_id)
+            self.not_finished = len(case_info["not_finished"])
 
-        if (case.cancelled) and (case.case_id not in Delta.case_info["cancelled"]):
-            self.cancelled += 1
-            Delta.case_info["cancelled"].append(case.case_id)
+        if not(case.cancelled) and not (case.ongoing) and not(case.complete):
+            case_info["incomplete"].add(case.case_id)
+            self.incomplete_cases = len(case_info["incomplete"])
 
     def generate_report(self):
         """
@@ -57,13 +59,13 @@ class Delta:
 
         :return: A dictionary containing the summary statistics.
         """
+        print()
         return {
             "delta_file_name": self.delta_file_name,
             "event_counts": dict(self.event_counter),
             "total_events": sum(dict(self.event_counter).values()),
-            "ongoing_cases": self.ongoing_cases,
+            "not_finished": self.not_finished,
             "cancelled_cases": self.cancelled,
-            "sleep_cases": self.expired_cases,
             "complete_cases": self.complete_cases,
             "incomplete_cases": self.incomplete_cases,
             "initialised cases": self.initialised_cases,
@@ -74,17 +76,11 @@ class Delta:
          }
 
     def __str__(self):
-        """
-        String representation of the delta statistics.
-
-        :return: A formatted string summarizing the delta statistics.
-        """
         report = self.generate_report()
         return (f"Delta File: {report['delta_file_name']}\n"
                 f"Events: {report['event_counts']}\n"
                 f"New Cases: {report['new_cases']}\n"
-                f"Finished Cases: {report['ongoing_cases']}\n"
-                f"Expired Cases: {report['expired_cases']}\n"
+                f"Finished Cases: {report['not_finished']}\n"
                 f"Complete Cases: {report['complete_cases']}\n"
                 f"Incomplete Cases: {report['incomplete_cases']}\n"
                 f"Total Number of Events Occured: {report['total_events']}")

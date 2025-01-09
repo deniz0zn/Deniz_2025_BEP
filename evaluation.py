@@ -49,7 +49,7 @@ class CompletenessEvaluator:
         last_events = sampled_events.sort_values(by="completeTime").groupby("case_id").last()
 
         # Label cases manually based on rules
-        last_events["isComplete"] = last_events.apply(
+        last_events["complete"] = last_events.apply(
             lambda row: row["state"] == "Billed" and self.has_critical_events(row.name) and not row["isCancelled"], axis=1
         )
 

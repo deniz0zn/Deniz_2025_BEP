@@ -25,7 +25,7 @@ class EventLogSplitter:
         self.dataframe = pd.read_csv(self.csv_file_path, keep_default_na=False, na_values=['NaN', "", " "])
         self.dataframe["case"] = self.dataframe["case"].astype(str)
 
-        
+
 
         self.dataframe['completeTime'] = pd.to_datetime(self.dataframe['completeTime']).dt.tz_localize(None)
         self.dataframe = self.dataframe.sort_values(by='completeTime')

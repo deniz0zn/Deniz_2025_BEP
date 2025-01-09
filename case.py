@@ -1,8 +1,9 @@
 from datetime import timedelta, datetime
-
 import pandas as pd
 
 from delta import Delta
+from config import attributes_to_check
+
 
 class Case:
     def __init__(self, event, delta_name: str, delta: Delta):
@@ -22,28 +23,31 @@ class Case:
         self.trace = [self.last_event]
         self.length = len(self.trace)
 
-        self.cancelled = False
 
+        self.cancelled = False
+        self.complete = False
+        self.incomplete = None
+        self.isBilled = False
+        self.have_crit_events = False
         self.issues = [f"Missing critical events: {self.missing_events}",
                        "Case is not billed.",
                        "Case is not finished.",
                        ]
 
-        self.isComplete = False
-        self.isBilled = False
         self.short = True
-
         self.t_since_last_event = timedelta(0)
         self.event_gaps = [self.t_since_last_event]
         self.avg_wait_time = None
-        self.sleep = False
 
-        self.have_crit_events = False
+        self.sleep = False
         self.ongoing = True
 
         self.first_delta = delta_name
         self.last_delta_update = delta_name
         self.delta_counts = [0]
+
+        self.missing_attributes = {}
+        self.n_events_w_missing_attr = 0
 
     def initialize_timestamps(self, event):
         """Initialize the timestamp attributes."""
@@ -66,8 +70,9 @@ class Case:
         self.update_event_attributes(event)
         self.update_case_status(event, delta)
         self.update_time_gap(event)
-        self.check_completeness(event, delta)
+        self.check_completeness()
         self.append_delta(delta, delta_counts)
+        delta.process_event(event)
     def update_event_attributes(self, event):
         """Update attributes related to the event."""
         self.last_event = event.get('event')
@@ -80,7 +85,7 @@ class Case:
         """Update the case status attributes."""
         self.cancelled = event.get('isCancelled', False)
         self.isBilled = self.last_state == "Billed"
-        self.have_crit_events = self.event_check()
+        self.have_crit_events = self.crit_event_check()
 
         self.short = self.length < 5
         self.sleep = False
@@ -106,24 +111,29 @@ class Case:
     def update_sleep(self):
         self.sleep = True
         self.ongoing = False
+        self.incomplete = True
+        self.complete = False
 
     def append_delta(self,delta: Delta, delta_counts: pd.DataFrame):
         self.delta_counts.append(delta_counts.loc[self.case_id, "count"])
         self.last_delta_update = delta.delta_file_name
 
-    def check_completeness(self, event, delta: Delta):
-        """Check and update the completeness of the case."""
-        self.isComplete = self.is_complete()
-        delta.process_event(event)
 
-    def event_check(self):
+
+    def check_missing_attributes(self, event):
+        missing = [attr for attr in attributes_to_check if not self.last_event]# List of Missing attributes in the event
+        self.missing_attributes[self.last_event] = missing
+        self.n_events_w_missing_attr += len(self.missing_attributes[self.last_event])
+
+
+    def crit_event_check(self):
         """Check if all critical events are present."""
         not_missing = self.critical_events.issubset(self.unique_events)
         self.missing_events = self.critical_events - self.unique_events
 
         return not_missing
 
-    def is_complete(self):
+    def check_completeness(self):
         """Evaluate whether the case is complete."""
         self.issues.clear()
         completeness = True
@@ -133,17 +143,18 @@ class Case:
                 completeness = False
                 self.issues.append(f"Missing critical events: {self.missing_events}")
 
-            if not self.isBilled:
-                completeness = False
-                self.issues.append("Case is not billed.")
+            # if not self.isBilled:
+            #     completeness = False
+            #     self.issues.append("Case is not billed.")
 
             if self.ongoing:
                 completeness = False
-                self.issues.append("Case is not finished.")
+                self.issues.append("Case is not finalised. (Not Billed or Cancelled)")
         # else:
         #     completeness = None
 
-        return completeness
-
+        self.complete = completeness
+        self.incomplete = False if completeness else None
+        self.ongoing = False
 
 

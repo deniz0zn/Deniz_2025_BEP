@@ -9,7 +9,7 @@ from delta import Delta
 from config import (
     dataset_path, initial_months, frequency, filename,
     output_dir, sample_size, cases_output_path, delta_output_path,
-    Evaluate, Plot, max_days
+    Evaluate, Plot, max_days, attributes_to_check
 )
 
 
@@ -18,14 +18,8 @@ class ProcessManager:
         self.cases = {}
         self.delta_stats_list = []
         self.output_dir = output_dir
-        Delta.case_info = {
-            "ongoing": [],
-            "completed": [],
-            "sleep": [],
-            "incomplete": [],
-            "cancelled": []
-        }
         self.delta_counts = pd.DataFrame(columns=["case_id", "count"]).set_index("case_id")
+
 
     # ===================== Helper Functions ===================== #
 
@@ -44,9 +38,11 @@ class ProcessManager:
 
     def perform_sleep_check(self, limit):
         """Flag cases as sleep based on the delta count limit."""
-        sleep_ids = set(self.delta_counts[self.delta_counts["count"] > limit].index)
+        sleep_ids = set(self.delta_counts[(self.delta_counts["count"] > limit) and ()].index)
         for case_id in sleep_ids:
-            self.cases.get(case_id).update_sleep()
+            case = self.cases.get(case_id)
+            if not case.isComplete:
+                case.update_sleep()
 
     def update_case_or_initialize(self, event, delta_name, delta):
         """Update an existing case or initialize a new one."""
@@ -57,6 +53,8 @@ class ProcessManager:
         else:
             self.cases[case_id].update(event, delta, self.delta_counts)
             self.reset_case_count(case_id)
+
+
 
     # ===================== Core Functions ===================== #
 
@@ -75,13 +73,20 @@ class ProcessManager:
         event_log = pd.read_csv(path, keep_default_na=False, na_values=['NaN', "", " "])
         delta = Delta(delta_name)
         cases_processed = event_log["case"].unique()
+        delta.case_info = {
+            "not_finished": set(),
+            "complete": set(),
+            "incomplete": set(),
+            "cancelled": set()
+        }
 
         self.increment_delta_counts()
 
         # Process each event
         for _, event in tqdm(event_log.iterrows(), total=len(event_log), desc=f"Processing events for {delta_name}"):
             self.update_case_or_initialize(event, delta_name, delta)
-
+            case = self.cases.get(event.get("case"))
+            case.check_missing_attributes(event)
         # Update delta attributes for processed cases
         for case_id in tqdm(cases_processed, desc=f"Updating delta attributes for {delta_name}"):
             case = self.cases.get(case_id)
@@ -89,6 +94,7 @@ class ProcessManager:
 
         self.perform_sleep_check(limit)
         self.delta_stats_list.append(delta.generate_report())
+
 
     def save_delta_statistics(self):
         """Save delta-level statistics to a CSV file."""
@@ -104,7 +110,7 @@ class ProcessManager:
 
         processed_cases = len(case_df)
         cancelled_cases = case_df[case_df["cancelled"]]
-        completed_cases = case_df[(case_df["isComplete"]) & (~case_df["cancelled"])]
+        completed_cases = case_df[(case_df["complete"]) & (~case_df["cancelled"])]
         not_cancelled = case_df[~case_df["cancelled"]]
 
         print(f"Number of Cases Processed: {processed_cases}")
@@ -135,6 +141,7 @@ class ProcessManager:
             "weekly": round(max_days / 7),
             "monthly": round(max_days / 30)
         }
+        limit = delta_limits[frequency]
 
         # Identify logs
         for file_name in os.listdir(self.output_dir):
@@ -145,10 +152,11 @@ class ProcessManager:
                 delta_logs.append((file_path, file_name))
 
         # Process logs
+        print(f"[PROCESS MANAGER] Limit for delta updates is set to: {limit}")
         print("[PROCESS MANAGER] Processing initial log file...")
-        self.process_logs(initial_log_path, "initial_log", limit=delta_limits[frequency])
+        self.process_logs(initial_log_path, "initial_log", limit=limit)
         for file, delta_name in delta_logs:
-            self.process_logs(file, delta_name, limit=delta_limits[frequency])
+            self.process_logs(file, delta_name, limit=limit)
 
         # Save results and evaluate
         self.save_delta_statistics()
@@ -158,4 +166,4 @@ class ProcessManager:
 
         end_time = time.time()
         m,s = divmod((end_time - start_time), 60)
-        print(f"Run Time: {m} minutes {s} seconds")
+        print(f"Run Time: {m} minutes {"%.2f" %s} seconds")
