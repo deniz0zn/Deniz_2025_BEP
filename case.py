@@ -16,6 +16,8 @@ class Case:
         self.critical_events = {"BILLED", "FIN", "RELEASE", "CODE OK"}
 
         self.case_id = event.get("case")
+        self.completeness_status = "ONGOING"
+        self.status_transitions = []
         self.last_state = event.get("state")
         self.last_event = event.get("event")
         self.unique_events = {self.last_event}
@@ -70,7 +72,7 @@ class Case:
         self.update_event_attributes(event)
         self.update_case_status(event, delta)
         self.update_time_gap(event)
-        self.check_completeness()
+        self.run_function_and_update_status(delta.delta_file_name,self.completeness_status ,self.check_completeness())      #self.check_completeness()
         self.append_delta(delta, delta_counts)
         delta.process_event(event)
     def update_event_attributes(self, event):
@@ -83,13 +85,17 @@ class Case:
 
     def update_case_status(self, event, delta: Delta):
         """Update the case status attributes."""
-        self.cancelled = event.get('isCancelled', False)
+        self.cancelled = self.run_function_and_update_status(delta.delta_file_name,
+                                                             self.completeness_status,
+                                                             self.check_cancelled(event))  #event.get('isCancelled', False)
         self.isBilled = self.last_state == "Billed"
         self.have_crit_events = self.crit_event_check()
 
         self.short = self.length < 5
         self.sleep = False
-        self.ongoing = not (self.cancelled or self.isBilled)
+        self.ongoing = self.run_function_and_update_status(delta.delta_file_name,
+                                                           self.completeness_status,
+                                                           self.check_ongoing())    #not (self.cancelled or self.isBilled)
 
         if self.case_id not in delta.initialised_cases:
             delta.ongoing_cases_count.add(self.case_id)
@@ -106,13 +112,6 @@ class Case:
         self.avg_wait_time = sum(self.event_gaps, timedelta(0)) / len(self.event_gaps)
         self.last_event_time = current_time
 
-
-
-    def update_sleep(self):
-        self.sleep = True
-        self.ongoing = False
-        self.incomplete = True
-        self.complete = False
 
     def append_delta(self,delta: Delta, delta_counts: pd.DataFrame):
         self.delta_counts.append(delta_counts.loc[self.case_id, "count"])
@@ -133,7 +132,21 @@ class Case:
 
         return not_missing
 
-    def check_completeness(self):
+    def run_function_and_update_status(self, delta_name: str, previous_status ,function: callable ):
+        value = function
+        new_status = self.completeness_status
+        transition = {
+            "previous": previous_status,
+            "new": new_status,
+            "delta_name": delta_name
+        }
+
+        if previous_status!= new_status:
+            self.status_transitions.append(transition)
+
+        if value != None:
+            return value
+    def check_completeness(self, returning = False):
         """Evaluate whether the case is complete."""
         self.issues.clear()
         completeness = True
@@ -154,7 +167,40 @@ class Case:
         #     completeness = None
 
         self.complete = completeness
-        self.incomplete = False if completeness else None
-        self.ongoing = False
+        if completeness:
+            self.completeness_status = "COMPLETE"
+            self.ongoing = False
+            self.incomplete = False
+        else:
+            self.incomplete = None
 
+        if self.cancelled:
+            self.completeness_status = "CANCELLED"
+            self.ongoing = False
+
+
+
+
+
+        if returning:
+            return completeness
+
+    def check_cancelled(self,event):
+        iscancelled = event.get('isCancelled', False)
+        self.cancelled = iscancelled
+        if iscancelled:
+            self.completeness_status = "CANCELLED"
+        return iscancelled
+
+    def check_ongoing(self):
+        isOngoing = not (self.cancelled or self.isBilled)
+        if isOngoing:
+            self.completeness_status = "ONGOING"
+        return isOngoing
+
+    def update_sleep(self):
+        self.sleep = True
+        self.ongoing = False
+        self.incomplete = True
+        self.completeness_status = "INCOMPLETE"
 

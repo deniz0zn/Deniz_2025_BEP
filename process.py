@@ -3,7 +3,6 @@ import pandas as pd
 from tqdm import tqdm
 import time
 from delta_log_formation import EventLogSplitter
-from evaluation import CompletenessEvaluator
 from case import Case
 from delta import Delta
 from config import (
@@ -36,13 +35,13 @@ class ProcessManager:
         temp_df = pd.DataFrame({"case_id": [case_id], "count": [0]}).set_index("case_id")
         self.delta_counts = pd.concat([self.delta_counts, temp_df])
 
-    def perform_sleep_check(self, limit):
+    def perform_sleep_check(self, limit: int, delta_name: str):
         """Flag cases as sleep based on the delta count limit."""
-        sleep_ids = set(self.delta_counts[(self.delta_counts["count"] > limit) and ()].index)
+        sleep_ids = set(self.delta_counts[(self.delta_counts["count"] > limit)].index)
         for case_id in sleep_ids:
             case = self.cases.get(case_id)
-            if not case.isComplete:
-                case.update_sleep()
+            if not (case.complete or case.cancelled):
+                case.run_function_and_update_status(delta_name, case.completeness_status, case.update_sleep())
 
     def update_case_or_initialize(self, event, delta_name, delta):
         """Update an existing case or initialize a new one."""
@@ -68,32 +67,6 @@ class ProcessManager:
         else:
             print(f"{frequency.capitalize()} delta logs already exist in {self.output_dir}. Skipping splitting.")
 
-    def process_logs(self, path, delta_name, limit):
-        """Process events in a single delta log."""
-        event_log = pd.read_csv(path, keep_default_na=False, na_values=['NaN', "", " "])
-        delta = Delta(delta_name)
-        cases_processed = event_log["case"].unique()
-        delta.case_info = {
-            "not_finished": set(),
-            "complete": set(),
-            "incomplete": set(),
-            "cancelled": set()
-        }
-
-        self.increment_delta_counts()
-
-        # Process each event
-        for _, event in tqdm(event_log.iterrows(), total=len(event_log), desc=f"Processing events for {delta_name}"):
-            self.update_case_or_initialize(event, delta_name, delta)
-            case = self.cases.get(event.get("case"))
-            case.check_missing_attributes(event)
-        # Update delta attributes for processed cases
-        for case_id in tqdm(cases_processed, desc=f"Updating delta attributes for {delta_name}"):
-            case = self.cases.get(case_id)
-            delta.process_case_status(case)
-
-        self.perform_sleep_check(limit)
-        self.delta_stats_list.append(delta.generate_report())
 
 
     def save_delta_statistics(self):
@@ -123,11 +96,34 @@ class ProcessManager:
 
     def perform_evaluation(self, event_log_path, case_output_path):
         """Perform evaluation of completeness detection."""
-        evaluator = CompletenessEvaluator(event_log_path, case_output_path)
-        sampled_events, sampled_case_ids = evaluator.sample_cases(sample_size)
-        manually_labeled_cases = evaluator.manually_label_cases(sampled_events)
-        metrics = evaluator.evaluate_predictions(sampled_case_ids, manually_labeled_cases)
-        return evaluator.generate_report(metrics)
+        pass
+
+    def process_logs(self, path, delta_name, limit):
+        """Process events in a single delta log."""
+        event_log = pd.read_csv(path, keep_default_na=False, na_values=['NaN', "", " "])
+        delta = Delta(delta_name)
+        cases_processed = event_log["case"].unique()
+        delta.case_info = {
+            "not_finished": set(),
+            "complete": set(),
+            "incomplete": set(),
+            "cancelled": set()
+        }
+
+        self.increment_delta_counts()
+
+        # Process each event
+        for _, event in tqdm(event_log.iterrows(), total=len(event_log), desc=f"Processing events for {delta_name}"):
+            self.update_case_or_initialize(event, delta_name, delta)
+            case = self.cases.get(event.get("case"))
+            case.check_missing_attributes(event)
+        # Update delta attributes for processed cases
+        for case_id in tqdm(cases_processed, desc=f"Updating delta attributes for {delta_name}"):
+            case = self.cases.get(case_id)
+            delta.process_case_status(case)
+
+        self.perform_sleep_check(limit,delta_name)
+        self.delta_stats_list.append(delta.generate_report())
 
     def run(self):
         """Run the entire process pipeline."""
@@ -161,9 +157,7 @@ class ProcessManager:
         # Save results and evaluate
         self.save_delta_statistics()
         self.save_case_statistics()
-        evaluation_report = self.perform_evaluation(dataset_path, cases_output_path)
-        print(evaluation_report)
-
+        
         end_time = time.time()
         m,s = divmod((end_time - start_time), 60)
         print(f"Run Time: {m} minutes {"%.2f" %s} seconds")
