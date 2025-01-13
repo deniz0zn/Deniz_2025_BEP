@@ -1,7 +1,7 @@
 import os
 
 dataset_path = 'Dataset/csv/Hospital Billing - Event Log.csv'
-initial_months = 1
+initial_months = 12
 frequency = 'weekly'  # 'daily', 'weekly', or 'monthly'
 
 filename = os.path.splitext(os.path.basename(dataset_path))[0]

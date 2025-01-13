@@ -26,10 +26,10 @@ class Case:
         self.length = len(self.trace)
 
 
-        self.cancelled = False
+        self.cancelled = self.check_cancelled(event)
         self.complete = False
         self.incomplete = None
-        self.isBilled = False
+        self.isBilled = self.last_state == "Billed"
         self.have_crit_events = False
         self.issues = [f"Missing critical events: {self.missing_events}",
                        "Case is not billed.",
@@ -87,7 +87,7 @@ class Case:
         """Update the case status attributes."""
         self.cancelled = self.run_function_and_update_status(delta.delta_file_name,
                                                              self.completeness_status,
-                                                             self.check_cancelled(event))  #event.get('isCancelled', False)
+                                                             self.check_cancelled(event))
         self.isBilled = self.last_state == "Billed"
         self.have_crit_events = self.crit_event_check()
 
@@ -95,7 +95,7 @@ class Case:
         self.sleep = False
         self.ongoing = self.run_function_and_update_status(delta.delta_file_name,
                                                            self.completeness_status,
-                                                           self.check_ongoing())    #not (self.cancelled or self.isBilled)
+                                                           self.check_ongoing())
 
         if self.case_id not in delta.initialised_cases:
             delta.ongoing_cases_count.add(self.case_id)
@@ -120,7 +120,7 @@ class Case:
 
 
     def check_missing_attributes(self, event):
-        missing = [attr for attr in attributes_to_check if not self.last_event]# List of Missing attributes in the event
+        missing = [attr for attr in attributes_to_check if not self.last_event] # List of Missing attributes in the event
         self.missing_attributes[self.last_event] = missing
         self.n_events_w_missing_attr += len(self.missing_attributes[self.last_event])
 
@@ -179,11 +179,7 @@ class Case:
             self.ongoing = False
 
 
-
-
-
-        if returning:
-            return completeness
+        return completeness if returning else None
 
     def check_cancelled(self,event):
         iscancelled = event.get('isCancelled', False)

@@ -6,19 +6,21 @@ from delta_log_formation import EventLogSplitter
 from case import Case
 from delta import Delta
 from config import (
-    dataset_path, initial_months, frequency, filename,
-    output_dir, sample_size, cases_output_path, delta_output_path,
+    dataset_path, cases_output_path, delta_output_path,
     Evaluate, Plot, max_days, attributes_to_check
 )
 
 
 class ProcessManager:
-    def __init__(self):
+    def __init__(self, initial_months, frequency, output_dir):
         self.cases = {}
         self.delta_stats_list = []
         self.output_dir = output_dir
         self.delta_counts = pd.DataFrame(columns=["case_id", "count"]).set_index("case_id")
-
+        self.initial = initial_months
+        self.frequency = frequency
+        self.cases_output_path = f"Dataset/Hospital Billing Delta Logs/cases_output/cases_output_{frequency}_({initial_months}).csv"
+        self.delta_output_path = f"Dataset/Hospital Billing Delta Logs/Delta Stats/delta_stats_{frequency}_({initial_months}).csv"
 
     # ===================== Helper Functions ===================== #
 
@@ -60,20 +62,20 @@ class ProcessManager:
     def check_or_split_logs(self):
         """Check if delta logs exist; if not, split the event log."""
         if not os.path.exists(self.output_dir):
-            print(f"Splitting event log into {frequency} delta logs...")
-            splitter = EventLogSplitter(dataset_path, frequency, initial_months)
+            print(f"Splitting event log into {self.frequency} delta logs...")
+            splitter = EventLogSplitter(dataset_path, self.frequency, self.initial)
             splitter.run_splitting()
             print(f"Splitting completed. Logs saved in {self.output_dir}.")
         else:
-            print(f"{frequency.capitalize()} delta logs already exist in {self.output_dir}. Skipping splitting.")
+            print(f"{self.frequency.capitalize()} delta logs already exist in {self.output_dir}. Skipping splitting.")
 
 
 
     def save_delta_statistics(self):
         """Save delta-level statistics to a CSV file."""
         delta_df = pd.DataFrame(self.delta_stats_list)
-        delta_df.to_csv(delta_output_path, index=False)
-        print(f"Delta Statistics saved to: {delta_output_path}")
+        delta_df.to_csv(self.delta_output_path, index=False)
+        print(f"Delta Statistics saved to: {self.delta_output_path}")
 
     def save_case_statistics(self):
         """Save case-level statistics to a CSV file."""
@@ -91,8 +93,8 @@ class ProcessManager:
         print(f"Number of Complete Cases (Without Cancelled cases): {len(completed_cases)}")
         print(f"Ratio of Completeness out of not cancelled cases: {((len(completed_cases) / len(not_cancelled)) * 100):.2f}%")
 
-        case_df.to_csv(cases_output_path, index=True)
-        print(f"Final Results saved to: {cases_output_path}")
+        case_df.to_csv(self.cases_output_path, index=True)
+        print(f"Final Results saved to: {self.cases_output_path}")
 
     def perform_evaluation(self, event_log_path, case_output_path):
         """Perform evaluation of completeness detection."""
@@ -137,7 +139,7 @@ class ProcessManager:
             "weekly": round(max_days / 7),
             "monthly": round(max_days / 30)
         }
-        limit = delta_limits[frequency]
+        limit = delta_limits[self.frequency]
 
         # Identify logs
         for file_name in os.listdir(self.output_dir):
