@@ -1,6 +1,5 @@
 import os
 import pandas as pd
-from datetime import timedelta
 from config import delta_dir_path
 
 

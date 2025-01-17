@@ -12,10 +12,10 @@ from config import (
 
 
 class ProcessManager:
-    def __init__(self, initial_months, frequency, output_dir):
+    def __init__(self, initial_months, frequency, delta_log_dir):
         self.cases = {}
         self.delta_stats_list = []
-        self.output_dir = output_dir
+        self.delta_log_dir = delta_log_dir
         self.delta_counts = pd.DataFrame(columns=["case_id", "count"]).set_index("case_id")
         self.initial = initial_months
         self.frequency = frequency
@@ -43,7 +43,7 @@ class ProcessManager:
         for case_id in sleep_ids:
             case = self.cases.get(case_id)
             if not (case.complete or case.cancelled):
-                case.run_function_and_update_status(delta_name, case.completeness_status, case.update_sleep())
+                case.run_function_and_update_status(delta_name, case.final_status, case.update_sleep())
 
     def update_case_or_initialize(self, event, delta_name, delta):
         """Update an existing case or initialize a new one."""
@@ -61,13 +61,13 @@ class ProcessManager:
 
     def check_or_split_logs(self):
         """Check if delta logs exist; if not, split the event log."""
-        if not os.path.exists(self.output_dir):
+        if not os.path.exists(self.delta_log_dir):
             print(f"Splitting event log into {self.frequency} delta logs...")
             splitter = EventLogSplitter(dataset_path, self.frequency, self.initial)
             splitter.run_splitting()
-            print(f"Splitting completed. Logs saved in {self.output_dir}.")
+            print(f"Splitting completed. Logs saved in {self.delta_log_dir}.")
         else:
-            print(f"{self.frequency.capitalize()} delta logs already exist in {self.output_dir}. Skipping splitting.")
+            print(f"{self.frequency.capitalize()} delta logs already exist in {self.delta_log_dir}. Skipping splitting.")
 
 
 
@@ -80,18 +80,23 @@ class ProcessManager:
     def save_case_statistics(self):
         """Save case-level statistics to a CSV file."""
         case_dict = {case_id: vars(case_obj) for case_id, case_obj in self.cases.items()}
-        case_df = pd.DataFrame.from_dict(case_dict, orient="index").drop(["critical_events", "t_since_last_event"], axis=1)
+        case_df = pd.DataFrame.from_dict(case_dict, orient="index").drop(["critical_events", "t_since_last_event","rejected_events"], axis=1)
         case_df["completion_time"] = case_df["last_event_time"] - case_df["first_event_time"]
 
         processed_cases = len(case_df)
         cancelled_cases = case_df[case_df["cancelled"]]
-        completed_cases = case_df[(case_df["complete"]) & (~case_df["cancelled"])]
-        not_cancelled = case_df[~case_df["cancelled"]]
+        completed_cases = case_df[(case_df["final_status"] == "COMPLETE")]
+        ongoing_cases = case_df[(case_df["final_status"] == "ONGOING")]
+        incomplete_cases = case_df[(case_df["final_status"] == "INCOMPLETE")]
+
 
         print(f"Number of Cases Processed: {processed_cases}")
         print(f"Number of Cancelled Cases: {len(cancelled_cases)}")
-        print(f"Number of Complete Cases (Without Cancelled cases): {len(completed_cases)}")
-        print(f"Ratio of Completeness out of not cancelled cases: {((len(completed_cases) / len(not_cancelled)) * 100):.2f}%")
+        print(f"Number of Complete Cases: {len(completed_cases)}")
+        print(f"Number of Ongoing Cases: {len(ongoing_cases)}")
+        print(f"Number of Incomplete Cases: {len(incomplete_cases)}")
+
+        print(f"Ratio of Complete cases: {((len(completed_cases) / processed_cases) * 100):.2f}%\n")
 
         case_df.to_csv(self.cases_output_path, index=True)
         print(f"Final Results saved to: {self.cases_output_path}")
@@ -142,8 +147,8 @@ class ProcessManager:
         limit = delta_limits[self.frequency]
 
         # Identify logs
-        for file_name in os.listdir(self.output_dir):
-            file_path = os.path.join(self.output_dir, file_name)
+        for file_name in os.listdir(self.delta_log_dir):
+            file_path = os.path.join(self.delta_log_dir, file_name)
             if "initial_log" in file_name:
                 initial_log_path = file_path
             elif "delta_log" in file_name:
