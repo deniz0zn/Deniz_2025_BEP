@@ -6,7 +6,6 @@ class Delta:
         # Initialize attributes to track statistics for the delta file
         self.delta_file_name = delta_file_name
         self.event_counter = Counter()
-        self.new_cases = 0
         self.not_finished = 0
         self.complete_cases = 0
         self.incomplete_cases = 0
@@ -35,21 +34,26 @@ class Delta:
         :param case: A `Case` object.
         """
         # Check case status and update counters
+        CANCELLED = (case.cancelled == True)
+        COMPLETE = (case.final_status == "COMPLETE") and not (CANCELLED)
+        ONGOING = (case.final_status == "ONGOING")
+
+
         case_info = self.case_info
 
-        if (case.cancelled):
+        if CANCELLED:
             case_info["cancelled"].add(case.case_id)
             self.cancelled = len(case_info["cancelled"])
 
-        if (case.complete) and not (case.cancelled):
+        if COMPLETE:
             case_info["complete"].add(case.case_id)
             self.complete_cases = len(case_info["complete"])
 
-        if (case.ongoing):
+        if ONGOING:
             case_info["not_finished"].add(case.case_id)
             self.not_finished = len(case_info["not_finished"])
 
-        if not(case.cancelled) and not (case.ongoing) and not(case.complete):
+        if not(CANCELLED) and not (ONGOING) and not(COMPLETE):
             case_info["incomplete"].add(case.case_id)
             self.incomplete_cases = len(case_info["incomplete"])
 
@@ -59,7 +63,6 @@ class Delta:
 
         :return: A dictionary containing the summary statistics.
         """
-        print()
         return {
             "delta_file_name": self.delta_file_name,
             "event_counts": dict(self.event_counter),
@@ -68,19 +71,10 @@ class Delta:
             "cancelled_cases": self.cancelled,
             "complete_cases": self.complete_cases,
             "incomplete_cases": self.incomplete_cases,
-            "initialised cases": self.initialised_cases,
-            "ongoing_cases_count": self.ongoing_cases_count,
-            "new_cases": self.new_cases,
-            "# ongoing cases": len(self.ongoing_cases_count),
-            "cases_processed" : len(self.initialised_cases) + len(self.ongoing_cases_count)
+            "initialised_cases_count": len(self.initialised_cases),
+            "updated_cases_count": len(self.ongoing_cases_count),
+            "cases_processed" : len(self.initialised_cases) + len(self.ongoing_cases_count),
+            "initialised_cases": self.initialised_cases,
+            "updated_cases": self.ongoing_cases_count,
          }
 
-    def __str__(self):
-        report = self.generate_report()
-        return (f"Delta File: {report['delta_file_name']}\n"
-                f"Events: {report['event_counts']}\n"
-                f"New Cases: {report['new_cases']}\n"
-                f"Finished Cases: {report['not_finished']}\n"
-                f"Complete Cases: {report['complete_cases']}\n"
-                f"Incomplete Cases: {report['incomplete_cases']}\n"
-                f"Total Number of Events Occured: {report['total_events']}")
