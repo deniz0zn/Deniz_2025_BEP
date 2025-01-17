@@ -1,6 +1,8 @@
 import plotly.express as px
 import plotly.graph_objects as go
+from plotly.subplots import make_subplots
 import pandas as pd
+from collections import Counter
 from config import cases_output_path, delta_output_path
 
 
@@ -9,16 +11,15 @@ class VisualizationManager:
         self.delta_stats = pd.read_csv(delta_stats_path)
         self.case_stats = pd.read_csv(case_output_path)
 
-        self.complete_cases = self.case_stats[self.case_stats['complete'] == True]
+        self.complete_cases = self.case_stats[self.case_stats['final_status'] == "COMPLETE"]
         self.cancelled_cases = self.case_stats[self.case_stats['cancelled']]
-
+        self.incomplete_cases = self.case_stats[self.case_stats['final_status'] == "INCOMPLETE"]
+        self.ongoing_cases = self.case_stats[self.case_stats['final_status'] == "ONGOING"]
 
     def plot_event_counts_line_chart(self):
         """
         Plot a line chart showing the event counts for each delta file.
         """
-
-        # self.delta_stats = self.delta_stats.drop(index=0)
         self.delta_stats["delta_file_name"] = self.delta_stats["delta_file_name"].astype(str)
         event_counts_df = self.delta_stats[["delta_file_name", "event_counts"]]
 
@@ -39,40 +40,135 @@ class VisualizationManager:
             title="Event Counts Across Delta Files",
             labels={"delta_file_name": "Delta File", "Count": "Event Count"}
         )
-        fig.update_layout(hovermode="x unified")
+        fig.update_layout(
+            hovermode="x unified",
+            xaxis_tickangle=45,
+            font_size=16
+        )
         fig.show()
 
     def plot_case_status_pie_chart(self):
         """
         Plot a pie chart showing the proportion of cancelled, complete, and incomplete cases.
         """
-        # Aggregate data
-        cancelled_cases = self.case_stats[self.case_stats["cancelled"]]
-        complete_cases = self.case_stats[self.case_stats["complete"] == True]
-        ongoing_cases = self.case_stats[self.case_stats["ongoing"]]
-        incomplete_cases = self.case_stats[(self.case_stats["cancelled"] == False) & (self.case_stats["complete"] ==False) & (self.case_stats["ongoing"] == False)]
-
-        # Prepare data for the pie chart
         pie_data = pd.DataFrame({
-            "Status": ["Cancelled Cases", "Complete Cases", "Incomplete Cases", "Ongoing Cases"],
-            "Count": [len(cancelled_cases), len(complete_cases), len(incomplete_cases), len(ongoing_cases)]
+            "Status": ["Complete Traces", "Incomplete Traces", "Ongoing Traces"],
+            "Count": [len(self.complete_cases), len(self.incomplete_cases), len(self.ongoing_cases)]
         })
 
-        # Plot the pie chart
         fig = px.pie(
             pie_data,
             values="Count",
             names="Status",
-            title="Case Status Distribution",
+            title="Completeness Status Distribution",
             hole=0.3
         )
         fig.update_traces(textinfo="percent+label")
+        fig.update_layout(font_size=16)
+        fig.show()
+
+    def plot_incompleteness_reasons(self):
+        """
+        Incompleteness Reasons
+        """
+        reasons = self.incomplete_cases['issues'].apply(
+            lambda x: 'Missing events' if x.startswith('Missing events:') else x)
+
+        reason_counts = reasons.value_counts()
+        reason_df = pd.DataFrame({"Reason": reason_counts.index, "Count": reason_counts.values})
+
+        fig = px.pie(
+            reason_df,
+            values="Count",
+            names="Reason",
+            title="Sources of Incompleteness",
+            hole=0.3
+        )
+        fig.update_traces(textinfo="percent+label")
+        fig.update_layout(font_size=16)
+        fig.show()
+
+    def plot_missing_events(self):
+        """
+        Most common missing events in incomplete cases.
+        """
+        missing_events_cases = self.incomplete_cases[self.incomplete_cases['issues'].str.startswith('Missing events:')]
+        all_missing_events = missing_events_cases['missing_events'].apply(
+            lambda x: eval(x) if isinstance(x, str) else set())
+        counter = Counter()
+        for events in all_missing_events:
+            counter.update(events)
+
+        missing_event_counts = pd.DataFrame(counter.items(), columns=["Event", "Count"]).sort_values(by="Count",
+                                                                                                     ascending=False)
+
+        fig = px.bar(
+            missing_event_counts,
+            x="Event",
+            y="Count",
+            title="Most Common Missing Events",
+            labels={"Count": "Frequency", "Event": "Event Name"}
+        )
+        fig.update_layout(
+            xaxis_tickangle=45,
+            font_size=16
+        )
+        fig.show()
+
+    def plot_complete_cases_pie_chart(self):
+        """
+        Pie chart of Billed, Cancelled, and Unbillable complete cases.
+        """
+        billed = len(self.complete_cases[self.complete_cases['isBilled']])
+        unbillable = len(self.complete_cases[(self.complete_cases['isUnbillable']) & ~(self.complete_cases['cancelled'])])
+        cancelled = len(self.complete_cases[self.complete_cases['cancelled']])
+
+        pie_data = pd.DataFrame({
+            "Type": ["Billed", "Unbillable", "Cancelled"],
+            "Count": [billed, unbillable, cancelled]
+        })
+
+        fig = px.pie(
+            pie_data,
+            values="Count",
+            names="Type",
+            title="Complete Cases Breakdown",
+            hole=0.3
+        )
+        fig.update_traces(textinfo="percent+label")
+        fig.update_layout(font_size=16)
+        fig.show()
+
+    def plot_incomplete_trace_last_states(self):
+        """
+        Subplots for last state and last event of incomplete traces.
+        """
+        not_finalised_cases = self.incomplete_cases[self.incomplete_cases['issues'] == "Trace is not finalised."]
+
+        # Count last states and last events
+        last_states = not_finalised_cases['last_state'].value_counts()
+        last_events = not_finalised_cases['last_event'].value_counts()
+
+        fig = make_subplots(rows=1, cols=2, subplot_titles=("Last States", "Last Events"))
+
+        fig.add_trace(
+            go.Bar(x=last_states.index, y=last_states.values, name="Last States"),
+            row=1, col=1
+        )
+        fig.add_trace(
+            go.Bar(x=last_events.index, y=last_events.values, name="Last Events"),
+            row=1, col=2
+        )
+
+        fig.update_layout(
+            title_text="Last States and Events for Incomplete Traces",
+            showlegend=False,
+            font_size=16
+        )
         fig.show()
 
 
-
-
-
+########################################################################################################################
 viz_manager = VisualizationManager(delta_output_path, cases_output_path)
 
 print("Generating Event Counts Line Chart...")
@@ -81,4 +177,14 @@ viz_manager.plot_event_counts_line_chart()
 print("Generating Case Status Pie Chart...")
 viz_manager.plot_case_status_pie_chart()
 
+print("Generating Reasons for Incompleteness Pie Chart...")
+viz_manager.plot_incompleteness_reasons()
 
+print("Generating Most Common Missing Events Bar Chart...")
+viz_manager.plot_missing_events()
+
+print("Generating Complete Cases Breakdown Pie Chart...")
+viz_manager.plot_complete_cases_pie_chart()
+
+print("Generating Last States and Events for Incomplete Traces Subplots...")
+viz_manager.plot_incomplete_trace_last_states()
