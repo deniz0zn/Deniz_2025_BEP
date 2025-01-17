@@ -5,7 +5,10 @@ from process import ProcessManager
 tests = {"initial_months": [1, 6, 12],
          "freq": ["daily", "weekly", "monthly"]}
 
-results = {"month_freq": [], "duration": [], "total_seconds": []}
+results = {"month": [],
+           "freq" : [],
+           "duration": [],
+           "total_seconds": []}
 
 
 
@@ -22,12 +25,20 @@ for month in tests["initial_months"]:
         total_seconds = end_time - start_time
         m,s = divmod((total_seconds), 60)
 
-        print(f"Measuring time for {month}_{freq} is {m} minutes {"%.2f" %s} seconds")
-        results["month_freq"].append(f"{month}_{freq}")
+        print(f"Measuring time for {month}_{freq} is {m} minutes {"%.1f" %s} seconds")
+        results["month"].append(f"{month}")
+        results["freq"].append(freq)
         results["duration"].append(f"{m} minutes {"%.2f" %s} seconds")
         results["total_seconds"].append(total_seconds)
 
 df_results = pd.DataFrame(results)
 print(df_results)
 df_results.to_csv('Dataset/Hospital Billing Delta Logs/run_time_results.csv')
+
+
+month_grouped_avg = df_results.groupby("month").agg({"total_seconds":"mean"})
+freq_grouped_avg = df_results.groupby("freq").agg({"total_seconds":"mean"})
+print(month_grouped_avg)
+print(freq_grouped_avg)
+
 
