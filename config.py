@@ -1,7 +1,7 @@
 import os
 
 dataset_path = 'Dataset/csv/Hospital Billing - Event Log.csv'
-initial_months = 6
+initial_months = 1
 frequency = 'weekly'  # 'daily', 'weekly', or 'monthly'
 
 filename = os.path.splitext(os.path.basename(dataset_path))[0]
@@ -16,8 +16,7 @@ max_days = 190
 sample_size = 100
 __RANDOM_SEED__ = 31
 
-Evaluate = True
-Plot = True
+test_eval = True  # DEFAULT: False
 
 evet_counter = dict()
 

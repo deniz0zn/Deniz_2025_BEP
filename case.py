@@ -14,7 +14,7 @@ class Case:
     def initialize_case_attributes(self, event, delta_name: str, delta: Delta):
         """Initialize the primary attributes of the Case."""
         self.critical_events = {"BILLED", "FIN", "RELEASE", "CODE OK"}
-        self.rejected_events = {"STORNO", "REJECT"}
+        self.rejected_events = {"STORNO", "REJECT", "SET STATUS"}
 
         self.case_id = event.get("case")
         self.final_status = "ONGOING"
@@ -171,11 +171,7 @@ class Case:
         if not self.cancelled:
             if self.ongoing:
                 completeness = False
-                self.issues = "Trace is not finalised."
-
-            # elif (self.isUnbillable) and not (self.have_crit_events):
-            #     completeness = False
-            #     self.issues = f"Missing events: {self.missing_events}"
+                self.issues = "Trace is not finalised"
 
             elif not self.have_crit_events:
                 completeness = False
