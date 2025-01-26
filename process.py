@@ -5,9 +5,10 @@ import time
 from delta_log_formation import EventLogSplitter
 from case import Case
 from delta import Delta
+from evaluation import evaluate, calculate_weighted_metrics
 from config import (
     dataset_path, cases_output_path, delta_output_path,
-    Evaluate, Plot, max_days, attributes_to_check
+    max_days, attributes_to_check
 )
 
 
@@ -21,9 +22,9 @@ class ProcessManager:
         self.frequency = frequency
         self.cases_output_path = f"Dataset/Hospital Billing Delta Logs/cases_output/cases_output_{frequency}_({initial_months}).csv"
         self.delta_output_path = f"Dataset/Hospital Billing Delta Logs/Delta Stats/delta_stats_{frequency}_({initial_months}).csv"
+        self.evaluation_output_path = f"Dataset/Hospital Billing Delta Logs/evaluation/eval_{frequency}_({initial_months}).csv"
 
     # ===================== Helper Functions ===================== #
-
     def increment_delta_counts(self):
         """Increment delta counts for all cases."""
         self.delta_counts["count"] += 1
@@ -82,6 +83,7 @@ class ProcessManager:
         delta_df = pd.DataFrame(self.delta_stats_list)
         delta_df.to_csv(self.delta_output_path, index=False)
         print(f"Delta Statistics saved to: {self.delta_output_path}")
+        return delta_df
 
     def save_case_statistics(self):
         """Save case-level statistics to a CSV file."""
@@ -106,10 +108,17 @@ class ProcessManager:
 
         case_df.to_csv(self.cases_output_path, index=True)
         print(f"Final Results saved to: {self.cases_output_path}")
+        return case_df
 
-    def perform_evaluation(self, event_log_path, case_output_path):
+    def perform_evaluation(self, delta_stats, case_stats):
         """Perform evaluation of completeness detection."""
-        pass
+        evaluation_df = evaluate(delta_stats, case_stats)
+        evaluation_df.to_csv(self.evaluation_output_path, index=True)
+
+        weighted_metrics = calculate_weighted_metrics(evaluation_df)
+        for metric, value in weighted_metrics.items():
+            print(f"{metric}: {value:.2f}")
+
 
     def process_logs(self, path, delta_name, limit):
         """Process events in a single delta log."""
@@ -170,10 +179,14 @@ class ProcessManager:
         for file, delta_name in delta_logs:
             self.process_logs(file, delta_name, limit=limit)
 
+
         # Save results and evaluate
-        self.save_delta_statistics()
-        self.save_case_statistics()
-        
+        delta_stats = self.save_delta_statistics()
+        case_stats = self.save_case_statistics()
+
         end_time = time.time()
         m,s = divmod((end_time - start_time), 60)
         print(f"Run Time: {m} minutes {"%.2f" %s} seconds")
+
+        self.perform_evaluation(delta_stats, case_stats)
+
