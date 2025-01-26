@@ -30,7 +30,7 @@ class VisualizationManager:
         # Melt the DataFrame for Plotly
         melted_event_counts = event_counts_expanded.melt(id_vars=["delta_file_name"], var_name="Event",
                                                          value_name="Count")
-
+        melted_event_counts["Count"].fillna(0, inplace=True)
         # Plot the line chart
         fig = px.line(
             melted_event_counts,
@@ -141,35 +141,143 @@ class VisualizationManager:
 
     def plot_incomplete_trace_last_states(self):
         """
-        Subplots for last state and last event of incomplete traces.
+        Create subplots for the frequency of last states and last events for incomplete traces.
+        One set of subplots is for cases with the issue "missing events",
+        and the other is for cases with the issue "Trace is not finalised".
         """
-        not_finalised_cases = self.incomplete_cases[self.incomplete_cases['issues'] == "Trace is not finalised."]
 
-        # Count last states and last events
-        last_states = not_finalised_cases['last_state'].value_counts()
-        last_events = not_finalised_cases['last_event'].value_counts()
+        missing_events_cases = self.incomplete_cases[self.incomplete_cases["issues"].str.contains("Missing events", na=False)]
+        not_finalised_cases = self.incomplete_cases[self.incomplete_cases["issues"] == "Trace is not finalised"]
 
-        fig = make_subplots(rows=1, cols=2, subplot_titles=("Last States", "Last Events"))
+        missing_events_last_states = missing_events_cases["last_state"].value_counts()
+        not_finalised_last_states = not_finalised_cases["last_state"].value_counts()
 
+        missing_events_last_events = missing_events_cases["last_event"].value_counts()
+        not_finalised_last_events = not_finalised_cases["last_event"].value_counts()
+        print("MISSING EVENTS",missing_events_last_events)
+        print("NOT FINALISED", not_finalised_last_events)
+
+        fig = make_subplots(
+            rows=2, cols=2,
+            subplot_titles=(
+                "Last States (Missing Events)", "Last States (Trace is Not Finalised)",
+                "Last Events (Missing Events)", "Last Events (Trace is Not Finalised)"
+            )
+        )
+
+        # Add bar charts for last states
         fig.add_trace(
-            go.Bar(x=last_states.index, y=last_states.values, name="Last States"),
+            go.Bar(
+                x=missing_events_last_states.index,
+                y=missing_events_last_states.values,
+                name="Missing Events - Last States"
+            ),
             row=1, col=1
         )
         fig.add_trace(
-            go.Bar(x=last_events.index, y=last_events.values, name="Last Events"),
+            go.Bar(
+                x=not_finalised_last_states.index,
+                y=not_finalised_last_states.values,
+                name="Trace Not Finalised - Last States"
+            ),
             row=1, col=2
         )
 
+        # Add bar charts for last events
+        fig.add_trace(
+            go.Bar(
+                x=missing_events_last_events.index,
+                y=missing_events_last_events.values,
+                name="Missing Events - Last Events"
+            ),
+            row=2, col=1
+        )
+        fig.add_trace(
+            go.Bar(
+                x=not_finalised_last_events.index,
+                y=not_finalised_last_events.values,
+                name="Trace Not Finalised - Last Events"
+            ),
+            row=2, col=2
+        )
+
+        # Update layout
         fig.update_layout(
-            title_text="Last States and Events for Incomplete Traces",
+            title="Last States and Events for Incomplete Traces",
+            xaxis_title="State/Event",
+            yaxis_title="Frequency",
             showlegend=False,
-            font_size=16
+            height=800,
+            template="plotly_white"
+        )
+
+        # Adjust tick labels for readability
+        fig.update_xaxes(tickangle=45)
+
+        fig.show()
+
+    def plot_trace_classifications_across_deltas(self):
+        """
+        Plot a stacked bar chart showing the counts of traces classified as
+        COMPLETE, INCOMPLETE, CANCELLED, and ONGOING across deltas.
+        """
+        # Aggregate counts for each classification per delta
+        classifications = ["COMPLETE", "INCOMPLETE", "CANCELLED", "ONGOING"]
+        classification_counts = self.case_stats.groupby("delta_file_name")["final_status"].value_counts().unstack(
+            fill_value=0)
+
+        # Ensure all classifications are included
+        for cls in classifications:
+            if cls not in classification_counts:
+                classification_counts[cls] = 0
+
+        classification_counts = classification_counts[classifications]
+
+        # Plot the stacked bar chart
+        fig = px.bar(
+            classification_counts,
+            x=classification_counts.index,
+            y=classification_counts.columns,
+            title="Trace Classifications Across Deltas",
+            labels={"value": "Count", "variable": "Classification", "delta_file_name": "Delta File"},
+            barmode="stack"
+        )
+        fig.update_layout(font_size=16, xaxis_tickangle=45)
+        fig.show()
+
+    def plot_trace_classifications_across_deltas(self):
+        """
+        Plot a stacked bar chart showing the counts of traces classified as COMPLETE, INCOMPLETE, CANCELLED,
+        and ONGOING across deltas.
+        """
+        delta_trace_counts = self.delta_stats[["delta_file_name", "complete_count", "incomplete_count", "cancelled_count", "ongoing_count"]]
+        melted_delta_trace_counts = delta_trace_counts.melt(
+            id_vars="delta_file_name",
+            var_name="Trace Status",
+            value_name="Count"
+        )
+
+        fig = px.bar(
+            melted_delta_trace_counts,
+            x="delta_file_name",
+            y="Count",
+            color="Trace Status",
+            title="Trace Classifications Across Deltas",
+            labels={"delta_file_name": "Delta", "Count": "Number of Traces"},
+            barmode="stack"
+        )
+        fig.update_layout(
+            xaxis_tickangle=45,
+            font_size=16,
+            hovermode="x unified"
         )
         fig.show()
 
 
 ########################################################################################################################
 viz_manager = VisualizationManager(delta_output_path, cases_output_path)
+
+viz_manager.plot_trace_classifications_across_deltas()
 
 print("Generating Event Counts Line Chart...")
 viz_manager.plot_event_counts_line_chart()
