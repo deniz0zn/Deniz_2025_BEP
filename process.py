@@ -40,11 +40,14 @@ class ProcessManager:
     def perform_sleep_check(self, limit: int, delta_name: str):
         """Flag cases as sleep based on the delta count limit."""
         sleep_ids = set(self.delta_counts[(self.delta_counts["count"] > limit)].index)
+        inc_cases = set()
         for case_id in sleep_ids:
             case = self.cases.get(case_id)
-            if not (case.complete or case.cancelled):
+            # Ignore the cases that are already classified as complete, cancelled or incomplete
+            if not (case.complete or case.cancelled or case.incomplete):
+                self.log_incomplete_cases(case, inc_cases)
                 case.run_function_and_update_status(delta_name, case.final_status, case.update_sleep())
-
+        return inc_cases
     def update_case_or_initialize(self, event, delta_name, delta):
         """Update an existing case or initialize a new one."""
         case_id = event.get("case")
@@ -55,6 +58,9 @@ class ProcessManager:
             self.cases[case_id].update(event, delta, self.delta_counts)
             self.reset_case_count(case_id)
 
+    def log_incomplete_cases(self, case: Case, inc_cases: set):
+        case_id = case.case_id
+        inc_cases.add(case_id)
 
 
     # ===================== Core Functions ===================== #
@@ -118,18 +124,21 @@ class ProcessManager:
         }
 
         self.increment_delta_counts()
-
         # Process each event
         for _, event in tqdm(event_log.iterrows(), total=len(event_log), desc=f"Processing events for {delta_name}"):
             self.update_case_or_initialize(event, delta_name, delta)
             case = self.cases.get(event.get("case"))
             case.check_missing_attributes(event)
+
         # Update delta attributes for processed cases
         for case_id in tqdm(cases_processed, desc=f"Updating delta attributes for {delta_name}"):
             case = self.cases.get(case_id)
             delta.process_case_status(case)
 
-        self.perform_sleep_check(limit,delta_name)
+        incomplete_cases = self.perform_sleep_check(limit, delta_name)
+        delta.case_info["incomplete"] = incomplete_cases
+        delta.incomplete_cases = delta.case_info["incomplete"]
+
         self.delta_stats_list.append(delta.generate_report())
 
     def run(self):
