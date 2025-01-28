@@ -17,8 +17,16 @@ max_days = 190
 sample_size = 100
 __RANDOM_SEED__ = 31
 
-test_eval = True  # DEFAULT: False
+# Run the evaluation without running the model
+# Change it to True only if the case_output and delta_stat datasets exist
+test_eval = False
 
-attributes_to_check = ["case", "event", "startTime", "completeTime",
-                       "isCancelled", "blocked", "isClosed", "state"
-                       ]
+
+# Filters the Delta Logs you would like to observe before plotting the visualizations
+focus_deltas = [] # ["2013_w46", "2013_w47", "2013_w48", "2013_w49", "2013_w50"]
+
+attributes_for_miss_check = ["case", "event", "startTime", "completeTime",
+                             "isCancelled", "blocked", "isClosed", "state",
+                             ]
+
+

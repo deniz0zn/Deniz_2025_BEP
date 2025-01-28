@@ -2,7 +2,7 @@ from datetime import timedelta, datetime
 import pandas as pd
 
 from delta import Delta
-from config import attributes_to_check
+from config import attributes_for_miss_check
 
 
 class Case:
@@ -124,7 +124,7 @@ class Case:
 
 
     def check_missing_attributes(self, event):
-        missing = [attr for attr in attributes_to_check if not self.last_event] # List of Missing attributes in the event
+        missing = [attr for attr in attributes_for_miss_check if not self.last_event] # List of Missing attributes in the event
         self.missing_attributes[self.last_event] = missing
         self.n_events_w_missing_attr += len(self.missing_attributes[self.last_event])
 

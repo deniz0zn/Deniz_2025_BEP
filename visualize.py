@@ -3,13 +3,17 @@ import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 import pandas as pd
 from collections import Counter
-from config import cases_output_path, delta_output_path
+from config import cases_output_path, delta_output_path, focus_deltas
 
 
 class VisualizationManager:
-    def __init__(self, delta_stats_path, case_output_path):
+    def __init__(self, delta_stats_path, case_output_path, focus_deltas = []):
         self.delta_stats = pd.read_csv(delta_stats_path)
         self.case_stats = pd.read_csv(case_output_path)
+
+        if focus_deltas:
+            self.delta_stats = self.delta_stats[self.delta_stats["delta_file_name"].isin(focus_deltas)]
+            self.delta_stats.reset_index(drop=True, inplace=True)
 
         self.complete_cases = self.case_stats[self.case_stats['final_status'] == "COMPLETE"]
         self.cancelled_cases = self.case_stats[self.case_stats['cancelled']]
@@ -37,7 +41,7 @@ class VisualizationManager:
             x="delta_file_name",
             y="Count",
             color="Event",
-            title="Event Counts Across Delta Files",
+            title="Event Counts Across Delta Logs",
             labels={"delta_file_name": "Delta File", "Count": "Event Count"}
         )
         fig.update_layout(
@@ -60,7 +64,7 @@ class VisualizationManager:
             pie_data,
             values="Count",
             names="Status",
-            title="Completeness Status Distribution",
+            title="Trace Classification Distribution",
             hole=0.3
         )
         fig.update_traces(textinfo="percent+label")
@@ -71,12 +75,22 @@ class VisualizationManager:
         """
         Incompleteness Reasons
         """
+        # Map original reasons to customized labels
+        reason_mapping = {
+            'Missing events': "Missing Essential Events(2)",
+            'Trace is not finalised': "No Logical Final State(1)",
+            'No updates received': "No updates received(1&2)"
+        }
+
+        # Apply mapping to issues
         reasons = self.incomplete_cases['issues'].apply(
-            lambda x: 'Missing events' if x.startswith('Missing events:') else x)
+            lambda x: 'Missing events' if x.startswith('Missing events:') else x
+        ).map(reason_mapping)
 
         reason_counts = reasons.value_counts()
         reason_df = pd.DataFrame({"Reason": reason_counts.index, "Count": reason_counts.values})
 
+        # Create pie chart with customized labels
         fig = px.pie(
             reason_df,
             values="Count",
@@ -106,7 +120,7 @@ class VisualizationManager:
             missing_event_counts,
             x="Event",
             y="Count",
-            title="Most Common Missing Events",
+            title="Most Common Missing Events in Incomplete Traces",
             labels={"Count": "Frequency", "Event": "Event Name"}
         )
         fig.update_layout(
@@ -212,8 +226,8 @@ class VisualizationManager:
         # Update layout
         fig.update_layout(
             title="Last States and Events for Incomplete Traces",
-            xaxis_title="State/Event",
-            yaxis_title="Frequency",
+            # xaxis_title="State/Event",
+            # yaxis_title="Frequency",
             showlegend=False,
             font_size=18,
             width=1250,
@@ -226,18 +240,27 @@ class VisualizationManager:
 
         fig.show()
 
-
     def plot_trace_classifications_across_deltas(self):
         """
         Plot a stacked bar chart showing the counts of traces classified as COMPLETE, INCOMPLETE, CANCELLED,
         and ONGOING across deltas.
         """
-        delta_trace_counts = self.delta_stats[["delta_file_name", "complete_count", "incomplete_count", "cancelled_count", "ongoing_count"]]
+        delta_trace_counts = self.delta_stats[
+            ["delta_file_name", "complete_count", "incomplete_count", "ongoing_count"]]
         melted_delta_trace_counts = delta_trace_counts.melt(
             id_vars="delta_file_name",
             var_name="Trace Status",
             value_name="Count"
         )
+
+        trace_status_mapping = {
+            "complete_count": "Complete Traces",
+            "incomplete_count": "Incomplete Traces",
+            "ongoing_count": "Ongoing (Unclassified) Traces"
+        }
+        melted_delta_trace_counts["Trace Status"] = melted_delta_trace_counts["Trace Status"].map(trace_status_mapping)
+
+        category_order = ["Ongoing (Unclassified) Traces", "Complete Traces", "Incomplete Traces"]
 
         fig = px.bar(
             melted_delta_trace_counts,
@@ -246,34 +269,40 @@ class VisualizationManager:
             color="Trace Status",
             title="Trace Classifications Across Deltas",
             labels={"delta_file_name": "Delta", "Count": "Number of Traces"},
-            barmode="stack"
+            barmode="stack",
+            category_orders={"Trace Status": category_order}  # Enforce the custom stack order
         )
+
         fig.update_layout(
             xaxis_tickangle=45,
             font_size=16,
-            hovermode="x unified"
+            hovermode="x unified",
+            legend_title="Trace Classifications"
         )
+
         fig.show()
 
 
 ########################################################################################################################
-viz_manager = VisualizationManager(delta_output_path, cases_output_path)
+viz_manager = VisualizationManager(delta_output_path, cases_output_path, focus_deltas)
 
-viz_manager.plot_trace_classifications_across_deltas()
 
 print("Generating Event Counts Line Chart...")
 viz_manager.plot_event_counts_line_chart()
 
-print("Generating Case Status Pie Chart...")
+print("Generating Trace Classifications Across Delta...s")
+viz_manager.plot_trace_classifications_across_deltas()
+
+print("Generating Case Status Donut Chart...")
 viz_manager.plot_case_status_pie_chart()
 
-print("Generating Reasons for Incompleteness Pie Chart...")
+print("Generating Reasons for Incompleteness Donut Chart...")
 viz_manager.plot_incompleteness_reasons()
 
 print("Generating Most Common Missing Events Bar Chart...")
 viz_manager.plot_missing_events()
 
-print("Generating Complete Cases Breakdown Pie Chart...")
+print("Generating Complete Cases Breakdown Donut Chart...")
 viz_manager.plot_complete_cases_pie_chart()
 
 print("Generating Last States and Events for Incomplete Traces Subplots...")
