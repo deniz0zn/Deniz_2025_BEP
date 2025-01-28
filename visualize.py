@@ -225,7 +225,7 @@ class VisualizationManager:
 
         # Update layout
         fig.update_layout(
-            title="Last States and Events for Incomplete Traces",
+            title="Last States and Events of Incomplete Traces",
             # xaxis_title="State/Event",
             # yaxis_title="Frequency",
             showlegend=False,
