@@ -46,7 +46,7 @@ class Case:
         self.ongoing = True
 
         self.first_delta = delta_name
-        self.last_delta_update = delta_name
+        self.last_delta_update = delta_name[:8]
         self.delta_counts_array = [0]
 
         self.missing_attributes = {}

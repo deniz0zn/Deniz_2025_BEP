@@ -64,7 +64,7 @@ class VisualizationManager:
             hole=0.3
         )
         fig.update_traces(textinfo="percent+label")
-        fig.update_layout(font_size=16)
+        fig.update_layout(font_size=20, width=800, height=600)
         fig.show()
 
     def plot_incompleteness_reasons(self):
@@ -85,7 +85,7 @@ class VisualizationManager:
             hole=0.3
         )
         fig.update_traces(textinfo="percent+label")
-        fig.update_layout(font_size=16)
+        fig.update_layout(font_size=18, width=1000, height=800)
         fig.show()
 
     def plot_missing_events(self):
@@ -100,7 +100,7 @@ class VisualizationManager:
             counter.update(events)
 
         missing_event_counts = pd.DataFrame(counter.items(), columns=["Event", "Count"]).sort_values(by="Count",
-                                                                                                     ascending=False)
+                                                                                                         ascending=False)
 
         fig = px.bar(
             missing_event_counts,
@@ -111,7 +111,9 @@ class VisualizationManager:
         )
         fig.update_layout(
             xaxis_tickangle=45,
-            font_size=16
+            font_size=20,
+            width=1000,
+            height=600
         )
         fig.show()
 
@@ -136,7 +138,7 @@ class VisualizationManager:
             hole=0.3
         )
         fig.update_traces(textinfo="percent+label")
-        fig.update_layout(font_size=16)
+        fig.update_layout(font_size=20, width=800, height=600)
         fig.show()
 
     def plot_incomplete_trace_last_states(self):
@@ -146,7 +148,8 @@ class VisualizationManager:
         and the other is for cases with the issue "Trace is not finalised".
         """
 
-        missing_events_cases = self.incomplete_cases[self.incomplete_cases["issues"].str.contains("Missing events", na=False)]
+        missing_events_cases = self.incomplete_cases[
+            self.incomplete_cases["issues"].str.contains("Missing events", na=False)]
         not_finalised_cases = self.incomplete_cases[self.incomplete_cases["issues"] == "Trace is not finalised"]
 
         missing_events_last_states = missing_events_cases["last_state"].value_counts()
@@ -154,8 +157,6 @@ class VisualizationManager:
 
         missing_events_last_events = missing_events_cases["last_event"].value_counts()
         not_finalised_last_events = not_finalised_cases["last_event"].value_counts()
-        print("MISSING EVENTS",missing_events_last_events)
-        print("NOT FINALISED", not_finalised_last_events)
 
         fig = make_subplots(
             rows=2, cols=2,
@@ -165,12 +166,13 @@ class VisualizationManager:
             )
         )
 
-        # Add bar charts for last states
         fig.add_trace(
             go.Bar(
                 x=missing_events_last_states.index,
                 y=missing_events_last_states.values,
-                name="Missing Events - Last States"
+                name="Missing Events - Last States",
+                text=missing_events_last_states.values,
+                textposition="outside"
             ),
             row=1, col=1
         )
@@ -178,7 +180,9 @@ class VisualizationManager:
             go.Bar(
                 x=not_finalised_last_states.index,
                 y=not_finalised_last_states.values,
-                name="Trace Not Finalised - Last States"
+                name="Trace Not Finalised - Last States",
+                text=not_finalised_last_states.values,
+                textposition="outside"
             ),
             row=1, col=2
         )
@@ -188,7 +192,9 @@ class VisualizationManager:
             go.Bar(
                 x=missing_events_last_events.index,
                 y=missing_events_last_events.values,
-                name="Missing Events - Last Events"
+                name="Missing Events - Last Events",
+                text=missing_events_last_events.values,
+                textposition="outside"
             ),
             row=2, col=1
         )
@@ -196,7 +202,9 @@ class VisualizationManager:
             go.Bar(
                 x=not_finalised_last_events.index,
                 y=not_finalised_last_events.values,
-                name="Trace Not Finalised - Last Events"
+                name="Trace Not Finalised - Last Events",
+                text=not_finalised_last_events.values,
+                textposition="outside"  # Show values outside the bars
             ),
             row=2, col=2
         )
@@ -207,7 +215,9 @@ class VisualizationManager:
             xaxis_title="State/Event",
             yaxis_title="Frequency",
             showlegend=False,
-            height=800,
+            font_size=18,
+            width=1250,
+            height=1250,
             template="plotly_white"
         )
 
@@ -216,34 +226,6 @@ class VisualizationManager:
 
         fig.show()
 
-    def plot_trace_classifications_across_deltas(self):
-        """
-        Plot a stacked bar chart showing the counts of traces classified as
-        COMPLETE, INCOMPLETE, CANCELLED, and ONGOING across deltas.
-        """
-        # Aggregate counts for each classification per delta
-        classifications = ["COMPLETE", "INCOMPLETE", "CANCELLED", "ONGOING"]
-        classification_counts = self.case_stats.groupby("delta_file_name")["final_status"].value_counts().unstack(
-            fill_value=0)
-
-        # Ensure all classifications are included
-        for cls in classifications:
-            if cls not in classification_counts:
-                classification_counts[cls] = 0
-
-        classification_counts = classification_counts[classifications]
-
-        # Plot the stacked bar chart
-        fig = px.bar(
-            classification_counts,
-            x=classification_counts.index,
-            y=classification_counts.columns,
-            title="Trace Classifications Across Deltas",
-            labels={"value": "Count", "variable": "Classification", "delta_file_name": "Delta File"},
-            barmode="stack"
-        )
-        fig.update_layout(font_size=16, xaxis_tickangle=45)
-        fig.show()
 
     def plot_trace_classifications_across_deltas(self):
         """

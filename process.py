@@ -5,10 +5,10 @@ import time
 from delta_log_formation import EventLogSplitter
 from case import Case
 from delta import Delta
-from evaluation import evaluate, calculate_weighted_metrics
+from evaluation import evaluate, calculate_weighted_metrics, avg_cm_per_delta
 from config import (
-    dataset_path, cases_output_path, delta_output_path,
-    max_days, attributes_to_check
+    event_log_path, cases_output_path, delta_output_path,
+    max_days, evaluation_output_path
 )
 
 
@@ -20,9 +20,10 @@ class ProcessManager:
         self.delta_counts = pd.DataFrame(columns=["case_id", "count"]).set_index("case_id")
         self.initial = initial_months
         self.frequency = frequency
-        self.cases_output_path = f"Dataset/Hospital Billing Delta Logs/cases_output/cases_output_{frequency}_({initial_months}).csv"
-        self.delta_output_path = f"Dataset/Hospital Billing Delta Logs/Delta Stats/delta_stats_{frequency}_({initial_months}).csv"
-        self.evaluation_output_path = f"Dataset/Hospital Billing Delta Logs/evaluation/eval_{frequency}_({initial_months}).csv"
+        self.event_log_path = event_log_path
+        self.cases_output_path = cases_output_path
+        self.delta_output_path = delta_output_path
+        self.evaluation_output_path = evaluation_output_path
 
     # ===================== Helper Functions ===================== #
     def increment_delta_counts(self):
@@ -70,7 +71,7 @@ class ProcessManager:
         """Check if delta logs exist; if not, split the event log."""
         if not os.path.exists(self.delta_log_dir):
             print(f"Splitting event log into {self.frequency} delta logs...")
-            splitter = EventLogSplitter(dataset_path, self.frequency, self.initial)
+            splitter = EventLogSplitter(self.event_log_path, self.frequency, self.initial)
             splitter.run_splitting()
             print(f"Splitting completed. Logs saved in {self.delta_log_dir}.")
         else:
@@ -119,6 +120,7 @@ class ProcessManager:
         for metric, value in weighted_metrics.items():
             print(f"{metric}: {value:.2f}")
 
+        avg_cm_per_delta(evaluation_df, "VIS/confusion_matrix.png")
 
     def process_logs(self, path, delta_name, limit):
         """Process events in a single delta log."""

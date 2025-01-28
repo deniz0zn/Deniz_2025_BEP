@@ -3,7 +3,6 @@ import ast
 
 from matplotlib import pyplot as plt
 import seaborn as sns
-
 from config import test_eval
 
 def evaluate(delta_stats: pd.DataFrame, case_stats: pd.DataFrame) -> pd.DataFrame:
@@ -56,11 +55,18 @@ def evaluate(delta_stats: pd.DataFrame, case_stats: pd.DataFrame) -> pd.DataFram
         evaluation_metrics["F1-Score"].append(f1_score)
         evaluation_metrics["Traces Classified"].append(total_cases)
 
-    return pd.DataFrame(evaluation_metrics)
+    evaluation_df = pd.DataFrame(evaluation_metrics)
+
+
+    # plt.figure(figsize=(12, 6))
+    # evaluation_df["Traces Classified"].plot(kind="bar")
+    # plt.show()
+
+    return evaluation_df
 
 
 def calculate_weighted_metrics(evaluation_df: pd.DataFrame) -> dict:
-    """Calculate weighted macro average for Precision, Recall, and F1-Score."""
+    """Calculate weighted macro average for Accuracy, Precision, Recall, and F1-Score."""
 
     total_cases = evaluation_df["Traces Classified"].sum()
     weighted_accuracy = (
@@ -88,7 +94,7 @@ def calculate_weighted_metrics(evaluation_df: pd.DataFrame) -> dict:
     }
 
 
-def calculate_and_plot_weighted_confusion_matrix(evaluation_df: pd.DataFrame, save_path: str):
+def avg_cm_per_delta(evaluation_df: pd.DataFrame, save_path: str):
     """
     Calculate weighted averages of TP, FP, TN, FN and plot the confusion matrix.
 
@@ -96,44 +102,114 @@ def calculate_and_plot_weighted_confusion_matrix(evaluation_df: pd.DataFrame, sa
         evaluation_df (pd.DataFrame): DataFrame containing evaluation metrics for deltas.
         save_path (str): Path to save the confusion matrix plot.
     """
-    total_cases = evaluation_df["Traces Classified"].sum()
 
-    # Calculate weighted confusion matrix values
-    weighted_tp = (evaluation_df["TP"].multiply(evaluation_df["Traces Classified"]).sum() / total_cases)
-    weighted_fp = (evaluation_df["FP"].multiply(evaluation_df["Traces Classified"]).sum() / total_cases)
-    weighted_tn = (evaluation_df["TN"].multiply(evaluation_df["Traces Classified"]).sum() / total_cases)
-    weighted_fn = (evaluation_df["FN"].multiply(evaluation_df["Traces Classified"]).sum() / total_cases)
+    tp = round(evaluation_df["TP"].sum() / len(evaluation_df), 0)
+    fp = round(evaluation_df["FP"].sum() / len(evaluation_df), 0)
+    tn = round(evaluation_df["TN"].sum() / len(evaluation_df), 0)
+    fn = round(evaluation_df["FN"].sum() / len(evaluation_df), 0)
 
-    # Prepare confusion matrix for plotting
     matrix = [
-        [weighted_tp, weighted_fn],
-        [weighted_fp, weighted_tn]
+        [tp, fn],
+        [fp, tn]
     ]
     labels = ["Complete", "Incomplete"]
 
-    # Plot the confusion matrix
     plt.figure(figsize=(8, 6))
     sns.heatmap(
         matrix,
         annot=True,
-        fmt=".0f",  # Show values as decimals
         cmap="Blues",
+        fmt= '.0f',
         xticklabels=labels,
         yticklabels=labels,
         cbar=True
     )
-    plt.title("Weighted Confusion Matrix")
+    plt.title("Expected Confusion Matrix per Delta")
     plt.xlabel("Predicted Labels")
     plt.ylabel("True Labels")
     plt.tight_layout()
     plt.savefig(save_path)
     plt.close()
 
-    # Print weighted confusion matrix values
-    print("\nWeighted Confusion Matrix Values:")
-    print(f"TP: {weighted_tp:.2f}, FN: {weighted_fn:.2f}")
-    print(f"FP: {weighted_fp:.2f}, TN: {weighted_tn:.2f}")
+    print("\n AVG. Confusion Matrix Values:")
+    print(f"TP: {tp}, FN: {fn}")
+    print(f"FP: {fp}, TN: {tn}")
 
+    total_cases = tp + fp + tn + fn
+    accuracy = round((tp + tn) / total_cases, 2) if total_cases else 0.0
+    precision = round(tp / (tp + fp), 2) if (tp + fp) else 0.0
+    recall = round(tp / (tp + fn), 2) if (tp + fn) else 0.0
+    f1_score = round((2 * precision * recall) / (precision + recall), 2) if (precision + recall) else 0.0
+
+    # print(f"\nMetrics Calculated by Avg. of TP, FP, TN, FN"
+    #       f"\nAccuracy: {accuracy}\n"
+    #       f"Precision: {precision}\n"
+    #       f"Recal: {recall}\n"
+    #       f"F1 Score: {f1_score}\n")
+
+
+# def calculate_and_plot_weighted_confusion_matrix(evaluation_df: pd.DataFrame, save_path: str):
+#     """
+#     Calculate weighted averages of TP, FP, TN, FN and plot the confusion matrix.
+#
+#     Args:
+#         evaluation_df (pd.DataFrame): DataFrame containing evaluation metrics for deltas.
+#         save_path (str): Path to save the confusion matrix plot.
+#     """
+#     total_cases = evaluation_df["Traces Classified"].sum()
+#
+#     # Calculate weighted confusion matrix values
+#     weighted_tp = (
+#         evaluation_df["TP"].multiply(evaluation_df["Traces Classified"]).sum() / total_cases)
+#     weighted_fp = (
+#         evaluation_df["FP"].multiply(evaluation_df["Traces Classified"]).sum() / total_cases)
+#     weighted_tn = (
+#         evaluation_df["TN"].multiply(evaluation_df["Traces Classified"]).sum() / total_cases)
+#     weighted_fn = (
+#         evaluation_df["FN"].multiply(evaluation_df["Traces Classified"]).sum() / total_cases)
+#
+#     # Prepare confusion matrix for plotting
+#     matrix = [
+#         [weighted_tp, weighted_fn],
+#         [weighted_fp, weighted_tn]
+#     ]
+#     labels = ["Positive (Complete)", "Negative (Incomplete)"]
+#
+#     # Plot the confusion matrix
+#     plt.figure(figsize=(8, 6))
+#     sns.heatmap(
+#         matrix,
+#         annot=True,
+#         fmt=".0f",
+#         cmap="Blues",
+#         xticklabels=labels,
+#         yticklabels=labels,
+#         cbar=True
+#     )
+#     plt.title("Weighted Confusion Matrix")
+#     plt.xlabel("Predicted Labels")
+#     plt.ylabel("True Labels")
+#     plt.tight_layout()
+#     plt.savefig(save_path)
+#     plt.close()
+#
+#     # Print weighted confusion matrix values
+#     print("\nWeighted Confusion Matrix Values:")
+#     print(f"TP: {weighted_tp:.2f}, FN: {weighted_fn:.2f}")
+#     print(f"FP: {weighted_fp:.2f}, TN: {weighted_tn:.2f}")
+#
+#     tp, fp, tn, fn = weighted_tp, weighted_fp, weighted_tn, weighted_fn
+#     total_cases = tp + fp + tn + fn
+#     accuracy = round((tp + tn) / total_cases, 2) if total_cases else 0.0
+#     precision = round(tp / (tp + fp), 2) if (tp + fp) else 0.0
+#     recall = round(tp / (tp + fn), 2) if (tp + fn) else 0.0
+#     f1_score = round((2 * precision * recall) / (precision + recall), 2) if (precision + recall) else 0.0
+#
+#     print(f"\nMetrics Calculated by Weighted Macro Avg. of TP, FP, TN, FN"
+#           f"\nAccuracy: {accuracy}\n"
+#           f"Precision: {precision}\n"
+#           f"Recal: {recall}\n"
+#           f"F1 Score: {f1_score}\n")
 
 if test_eval:
     deltas = pd.read_csv("Dataset/Hospital Billing Delta Logs/Delta Stats/delta_stats_weekly_(1).csv",
@@ -149,8 +225,7 @@ if test_eval:
     for metric, value in weighted_metrics.items():
         print(f"{metric}: {value:.2f}")
 
-    calculate_and_plot_weighted_confusion_matrix(evaluation_df, "VIS/weighted_confusion_matrix.png")
-
+    avg_cm_per_delta(evaluation_df, "VIS/confusion_matrix.png")
 
 
 

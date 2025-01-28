@@ -33,7 +33,7 @@ for month in tests["initial_months"]:
 
 df_results = pd.DataFrame(results)
 print(df_results)
-df_results.to_csv('Dataset/Hospital Billing Delta Logs/run_time_results.csv')
+df_results.to_csv('Dataset/Hospital Billing Delta Logs/evaluation/run_time_results.csv')
 
 
 month_grouped_avg = df_results.groupby("month").agg({"total_seconds":"mean"})
