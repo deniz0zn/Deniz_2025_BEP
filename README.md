@@ -55,6 +55,20 @@ focus_deltas = []  # Specify deltas to include in visualizations, e.g., ["2013_w
 - **`delta_output_path`** points to the file storing delta statistics.
 - **`evaluation_output_path`** is configured for saving evaluation results.
 
+## Files to Run 
+
+- **`main.py`**  
+  Primary file to execute the full data processing pipeline. This script creates delta logs, evaluates traces, and generates statistics.
+
+- **`evaluation.py`**  
+    Specifically designed to evaluate the processed delta logs and generate final results such as case evaluation metrics. If `main.py` has already been run, and you wish to check evaluation results without reprocessing, set the `test_eval` value to `True` in `config.py`. This avoids reprocessing and allows you to directly evaluate the existing data.
+
+- **`test_processing_time.py`**  
+  Used to benchmark the processing time of different configurations (e.g., varying initial months or frequencies). Results are stored in `Dataset/Hospital Billing Delta Logs/evaluation/run_time_results.csv`.
+
+- **`visualize.py`**  
+  Contains visualization tools to generate insights from the processed data. It includes functions to create charts for event counts, trace classifications, incompleteness reasons, and more.
+
   
 ## Directory Structure
 ```bash
