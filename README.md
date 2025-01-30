@@ -14,9 +14,9 @@ This project provides a robust framework for processing and analyzing event logs
 
 ---
 
-## Technologies Used
-- **Pandas**: Data manipulation and processing.
-- **Plotly**: Interactive visualizations.
+## Modules Used
+- `pandas`: Data manipulation and processing.
+- `plotly`: Interactive visualizations.
   - [Plotly](https://plotly.com/) documentation.
 - `os`: Path and directory operations.
 - `json`: Handling nested data structures.
